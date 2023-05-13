@@ -9,6 +9,8 @@
         <Version>0.1.0</Version>
         <Title>C# Parser</Title>
         <Copyright>Endless Interactive</Copyright>
+        <PackageLicenseUrl>https://github.com/Endless-Interactive/csparser/blob/main/LICENSE</PackageLicenseUrl>
+        <RepositoryUrl>https://github.com/Endless-Interactive/csparser</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
