@@ -132,7 +132,16 @@ public class CSParameter
 
 	public override string ToString()
 	{
-		return $"{Type} {Name}{( Optional ? " = " + DefaultValue : "" )}";
+		var defaultValue = DefaultValue;
+
+		switch (Type)
+		{
+			case "string":
+				defaultValue = $"\"{defaultValue}\"";
+				break;
+		}
+
+		return $"{Type} {Name}{( Optional ? $" = {defaultValue}" : "" )}";
 	}
 }
 
