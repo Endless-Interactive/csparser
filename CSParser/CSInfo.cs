@@ -121,7 +121,7 @@ public class CSMethod : CSObject
 
 	public override string ToString()
 	{
-		return $"{ReturnType} {Name}({string.Join(", ", Parameters)})";
+		return $"{FullModifier} {ReturnType} {Name}({string.Join(", ", Parameters)})";
 	}
 }
 
