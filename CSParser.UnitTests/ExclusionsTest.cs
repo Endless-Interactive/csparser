@@ -128,4 +128,48 @@ public class ExclusionsTest
 
 		Assert.That(_exclusions.IsMethodExcluded(method));
 	}
+
+	[Test]
+	public void AddClassExclusion()
+	{
+		_exclusions.Add(CSExclusions.ExcludeType.Class, "^Test$");
+		Assert.Multiple(() =>
+		{
+			Assert.That(_exclusions.Classes, Has.Count.EqualTo(2));
+			Assert.That(_exclusions.Classes[1], Is.EqualTo("^Test$"));
+		});
+	}
+
+	[Test]
+	public void AddMethodExclusion()
+	{
+		_exclusions.Add(CSExclusions.ExcludeType.Method, "^Test$");
+		Assert.Multiple(() =>
+		{
+			Assert.That(_exclusions.Methods, Has.Count.EqualTo(2));
+			Assert.That(_exclusions.Methods[1], Is.EqualTo("^Test$"));
+		});
+	}
+
+	[Test]
+	public void AddNamespaceExclusion()
+	{
+		_exclusions.Add(CSExclusions.ExcludeType.Namespace, "^Test$");
+		Assert.Multiple(() =>
+		{
+			Assert.That(_exclusions.Namespaces, Has.Count.EqualTo(2));
+			Assert.That(_exclusions.Namespaces[1], Is.EqualTo("^Test$"));
+		});
+	}
+
+	[Test]
+	public void AddModifierExclusion()
+	{
+		_exclusions.Add(CSAccessModifier.Public);
+		Assert.Multiple(() =>
+		{
+			Assert.That(_exclusions.Modifiers, Has.Count.EqualTo(2));
+			Assert.That(_exclusions.Modifiers[1], Is.EqualTo(CSAccessModifier.Public));
+		});
+	}
 }
