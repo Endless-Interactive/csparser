@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSParser", "CSParser\CSParser.csproj", "{D7718727-3C82-464A-95FF-8EE626048DE3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSParser.UnitTests", "CSParser.UnitTests\CSParser.UnitTests.csproj", "{3FA24E68-16D8-4BDE-B087-EEC35BBCE144}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D7718727-3C82-464A-95FF-8EE626048DE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7718727-3C82-464A-95FF-8EE626048DE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7718727-3C82-464A-95FF-8EE626048DE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7718727-3C82-464A-95FF-8EE626048DE3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3FA24E68-16D8-4BDE-B087-EEC35BBCE144}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3FA24E68-16D8-4BDE-B087-EEC35BBCE144}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3FA24E68-16D8-4BDE-B087-EEC35BBCE144}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3FA24E68-16D8-4BDE-B087-EEC35BBCE144}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
