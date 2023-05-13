@@ -82,4 +82,80 @@ public class MethodTest
 
 		Assert.That(method.ToString(), Is.EqualTo("public void TestMethod(string test = \"random\")"));
 	}
+
+	[Test]
+	public void MethodsRender()
+	{
+		_generator.AddCode(@"
+namespace TestNamespace;
+
+public class Test
+{
+	public void TestMethod()
+	{
+	}
+
+	internal void TestInternalMethod()
+	{
+	}
+}
+");
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods, Has.Count.EqualTo(2));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public void TestMethod()"));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[1].ToString(), Is.EqualTo("internal void TestInternalMethod()"));
+		});
+	}
+
+	[Test]
+	public void InternalMethodsIsExcluded()
+	{
+		_generator.Exclude(CSAccessModifier.Internal);
+
+		_generator.AddCode(@"
+namespace TestNamespace;
+
+public class Test
+{
+	public void TestMethod()
+	{
+	}
+
+	internal void TestInternalMethod()
+	{
+	}
+}
+");
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public void TestMethod()"));
+		});
+	}
+
+	[Test]
+	public void ParsedMethodRendersWithParameters()
+	{
+		_generator.Exclude(CSAccessModifier.Internal);
+
+		_generator.AddCode(@"
+namespace TestNamespace;
+
+public class Test
+{
+	public void TestMethod(string str)
+	{
+	}
+}
+");
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public void TestMethod(string str)"));
+		});
+	}
 }
