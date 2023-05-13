@@ -6,11 +6,12 @@
         <Nullable>enable</Nullable>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <Authors>Endless Interactive</Authors>
-        <Version>0.1.0</Version>
+        <Version>0.2.0</Version>
         <Title>C# Parser</Title>
         <Copyright>Endless Interactive</Copyright>
         <PackageLicenseUrl>https://github.com/Endless-Interactive/csparser/blob/main/LICENSE</PackageLicenseUrl>
         <RepositoryUrl>https://github.com/Endless-Interactive/csparser</RepositoryUrl>
+        <Description>A C# parser</Description>
     </PropertyGroup>
 
     <ItemGroup>
