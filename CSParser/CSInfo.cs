@@ -14,10 +14,10 @@ public class CSClass : CSObject
 public class CSObject
 {
 	public CSAccessModifier AccessModifier;
-	public string Modifier;
-	public string Name;
+	public string Modifier = "";
+	public string Name = "";
 	public XMLDoc XmlDoc;
-	public string FullModifier => $"{CSExclusions.GetModifier(AccessModifier)}{GetModifier()}";
+	public string FullModifier => $"{GetModifier(AccessModifier)}{GetModifier()}";
 
 	private string GetModifier()
 	{
@@ -51,10 +51,20 @@ public class CSObject
 			"internal" => CSAccessModifier.Internal,
 			"protected internal" => CSAccessModifier.ProtectedInternal,
 			"private protected" => CSAccessModifier.PrivateProtected,
-			_ => throw new Exception($"Unknown access modifier: {mod}")
+			_ => throw new Exception($"Unknown access modifier: {modCheck}")
 		};
 
 		Modifier = mod;
+	}
+
+	public static string GetModifier(CSAccessModifier modifier)
+	{
+		return modifier switch
+		{
+			CSAccessModifier.PrivateProtected => "private protected",
+			CSAccessModifier.ProtectedInternal => "protected internal",
+			_ => modifier.ToString().ToLower()
+		};
 	}
 
 	public override string ToString()
@@ -174,12 +184,40 @@ public class CSExclusions
 	public enum ExcludeType
 	{
 		Namespace,
-		Class
+		Class,
+		Method
 	}
 
 	public List<string> Classes = new();
+	public List<string> Methods = new();
 	public List<CSAccessModifier> Modifiers = new();
 	public List<string> Namespaces = new();
+
+	public void Add(CSAccessModifier modifier)
+	{
+		Modifiers.Add(modifier);
+	}
+
+	/// <summary>
+	///     Excludes a namespace or class from being parsed.
+	/// </summary>
+	/// <param name="type"></param>
+	/// <param name="name"></param>
+	public void Add(ExcludeType type, string name)
+	{
+		switch (type)
+		{
+			case ExcludeType.Namespace:
+				Namespaces.Add(name);
+				break;
+			case ExcludeType.Class:
+				Classes.Add(name);
+				break;
+			case ExcludeType.Method:
+				Methods.Add(name);
+				break;
+		}
+	}
 
 	public bool IsNamespaceExcluded(string? _namespace)
 	{
@@ -188,7 +226,7 @@ public class CSExclusions
 
 	public bool IsMethodExcluded(CSMethod method)
 	{
-		return IsAccessModifierExcluded(method.AccessModifier);
+		return Methods.Any(m => new Regex(m).IsMatch(method.Name)) || IsAccessModifierExcluded(method.AccessModifier);
 	}
 
 	public bool IsClassExcluded(CSClass @class)
@@ -206,17 +244,7 @@ public class CSExclusions
 		return IsAccessModifierExcluded(field.AccessModifier);
 	}
 
-	public static string GetModifier(CSAccessModifier modifier)
-	{
-		return modifier switch
-		{
-			CSAccessModifier.PrivateProtected => "private protected",
-			CSAccessModifier.ProtectedInternal => "protected internal",
-			_ => modifier.ToString().ToLower()
-		};
-	}
-
-	private bool IsAccessModifierExcluded(CSAccessModifier modifier)
+	public bool IsAccessModifierExcluded(CSAccessModifier modifier)
 	{
 		return Modifiers.Any(mod => mod.Equals(modifier));
 	}

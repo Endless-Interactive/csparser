@@ -25,7 +25,7 @@ public class Generator
 	/// <param name="modifier"></param>
 	public void Exclude(CSAccessModifier modifier)
 	{
-		_exclusions.Modifiers.Add(modifier);
+		_exclusions.Add(modifier);
 	}
 
 	/// <summary>
@@ -35,15 +35,7 @@ public class Generator
 	/// <param name="name"></param>
 	public void Exclude(CSExclusions.ExcludeType type, string name)
 	{
-		switch (type)
-		{
-			case CSExclusions.ExcludeType.Namespace:
-				_exclusions.Namespaces.Add(name);
-				break;
-			case CSExclusions.ExcludeType.Class:
-				_exclusions.Classes.Add(name);
-				break;
-		}
+		_exclusions.Add(type, name);
 	}
 
 	public void AddDirectory(string path)
