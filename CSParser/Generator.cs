@@ -59,6 +59,7 @@ public partial class Generator
 		var root = tree.GetRoot();
 
 		var namespaces = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().ToList();
+		var namespaceFileScoped = false;
 
 		// This is a hack to find a file scope namespace since roslyn doesn't seem to support it.
 		if (namespaces.Count == 0)
@@ -67,6 +68,7 @@ public partial class Generator
 
 			if (match.Success)
 			{
+				namespaceFileScoped = true;
 				var fileScopeNamespace = match.Value.Replace("namespace ", "").Replace(";", "");
 
 				namespaces.Add(SyntaxFactory.NamespaceDeclaration(SyntaxFactory.ParseName(fileScopeNamespace)));
@@ -76,6 +78,8 @@ public partial class Generator
 		foreach (var nd in namespaces)
 		{
 			var namespaceName = nd.Name.ToString();
+
+			var node = namespaceFileScoped ? root : nd;
 
 			if (Exclusions.IsNamespaceExcluded(namespaceName))
 			{
@@ -87,14 +91,14 @@ public partial class Generator
 
 			if (existingInfo != null)
 			{
-				existingInfo.Classes.AddRange(GetClasses(root));
+				existingInfo.Classes.AddRange(GetClasses(node));
 				continue;
 			}
 
 			var csInfo = new CSInfo
 			{
 				Namespace = namespaceName,
-				Classes = GetClasses(root)
+				Classes = GetClasses(node)
 			};
 
 			if (csInfo.IsAllExcluded(Exclusions))
