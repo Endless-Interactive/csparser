@@ -8,7 +8,7 @@ namespace CSParser;
 
 public partial class Generator
 {
-	public static bool Debug = false;
+	public static bool Debug;
 	private CSExclusions _exclusions = new();
 	public List<CSInfo> Namespaces = new();
 
@@ -275,84 +275,85 @@ public partial class Generator
 	private XMLDoc GetXMLDocumentation(List<string> comments)
 	{
 		var xmlDoc = new XMLDoc();
+		var groupedComments = comments.Aggregate("", (current, comment) => current + $"{comment}\n");
 
-		foreach (var comment in comments)
+		if (comments.Count == 0)
+			return xmlDoc;
+
+		var xml = XDocument.Parse($"<root>{groupedComments.Replace("///", "")}</root>");
+
+		var summary = xml.Descendants("summary").FirstOrDefault();
+		if (summary != null)
+			xmlDoc.Summary = RemoveXMLSyntax(summary.Name.ToString(), summary.ToString());
+
+		var remarks = xml.Descendants("remarks").FirstOrDefault();
+		if (remarks != null)
+			xmlDoc.Remarks = RemoveXMLSyntax(remarks.Name.ToString(), remarks.ToString());
+
+		var returns = xml.Descendants("returns").FirstOrDefault();
+		if (returns != null)
+			xmlDoc.Returns = RemoveXMLSyntax(returns.Name.ToString(), returns.ToString());
+
+		var param = xml.Descendants("param").ToList();
+		foreach (var p in param)
 		{
-			var xml = XDocument.Parse($"<root>{comment.Replace("///", "")}</root>");
+			var name = p.Attribute("name")?.Value;
+			var description = p.Value.Trim();
 
-			var summary = xml.Descendants("summary").FirstOrDefault();
-			if (summary != null)
-				xmlDoc.Summary = RemoveXMLSyntax(summary.Name.ToString(), summary.ToString());
+			if (name != null)
+				xmlDoc.Parameters.Add(new XMLDoc.XMLDocParam(name, description));
+		}
 
-			var remarks = xml.Descendants("remarks").FirstOrDefault();
-			if (remarks != null)
-				xmlDoc.Remarks = RemoveXMLSyntax(remarks.Name.ToString(), remarks.ToString());
+		var paramrefs = xml.Descendants("paramref").ToList();
+		foreach (var p in paramrefs)
+		{
+			var name = p.Attribute("name")?.Value;
+			var description = p.Value.Trim();
 
-			var returns = xml.Descendants("returns").FirstOrDefault();
-			if (returns != null)
-				xmlDoc.Returns = RemoveXMLSyntax(returns.Name.ToString(), returns.ToString());
+			if (name != null)
+				xmlDoc.ParamRefs.Add(new XMLDoc.XMLParamRef(name, description));
+		}
 
-			var param = xml.Descendants("param").ToList();
-			foreach (var p in param)
-			{
-				var name = p.Attribute("name")?.Value;
-				var description = p.Value.Trim();
+		var exception = xml.Descendants("exception").ToList();
+		foreach (var e in exception)
+		{
+			var cref = e.Attribute("cref")?.Value ?? "";
+			var description = RemoveXMLSyntax(e.Name.ToString(), e.ToString());
 
-				if (name != null)
-					xmlDoc.Parameters.Add(new XMLDoc.XMLDocParam(name, description));
-			}
+			xmlDoc.Exceptions.Add(new XMLDoc.XMLException(cref, description));
+		}
 
-			var paramrefs = xml.Descendants("paramref").ToList();
-			foreach (var p in paramrefs)
-			{
-				var name = p.Attribute("name")?.Value;
-				var description = p.Value.Trim();
+		var value = xml.Descendants("value").FirstOrDefault();
+		if (value != null)
+			xmlDoc.Value = value.Value.Trim();
 
-				if (name != null)
-					xmlDoc.ParamRefs.Add(new XMLDoc.XMLParamRef(name, description));
-			}
+		var see = xml.Descendants("see").ToList();
+		foreach (var s in see)
+		{
+			var cref = s.Attribute("cref")?.Value ?? "";
+			var href = s.Attribute("href")?.Value ?? "";
+			var langword = s.Attribute("langword")?.Value ?? "";
+			var description = s.Value.Trim();
 
-			var exception = xml.Descendants("exception").ToList();
-			foreach (var e in exception)
-			{
-				var cref = e.Attribute("cref")?.Value ?? "";
-				var description = RemoveXMLSyntax(e.Name.ToString(), e.ToString());
+			xmlDoc.See.Add(new XMLDoc.XMLSee(cref, href, description, langword));
+		}
 
-				xmlDoc.Exceptions.Add(new XMLDoc.XMLException(cref, description));
-			}
+		var seealso = xml.Descendants("seealso").ToList();
+		foreach (var s in seealso)
+		{
+			var cref = s.Attribute("cref")?.Value ?? "";
+			var href = s.Attribute("href")?.Value ?? "";
+			var description = s.Value.Trim();
 
-			var value = xml.Descendants("value").FirstOrDefault();
-			if (value != null)
-				xmlDoc.Value = value.Value.Trim();
+			xmlDoc.SeeAlso.Add(new XMLDoc.XMLSeeAlso(cref, href, description));
+		}
 
-			var see = xml.Descendants("see").ToList();
-			foreach (var s in see)
-			{
-				var cref = s.Attribute("cref")?.Value ?? "";
-				var href = s.Attribute("href")?.Value ?? "";
-				var langword = s.Attribute("langword")?.Value ?? "";
-				var description = s.Value.Trim();
+		var examples = xml.Descendants("example").ToList();
+		foreach (var e in examples)
+		{
+			var description = RemoveXMLSyntax(e.Name.ToString(), e.ToString());
 
-				xmlDoc.See.Add(new XMLDoc.XMLSee(cref, href, description, langword));
-			}
-
-			var seealso = xml.Descendants("seealso").ToList();
-			foreach (var s in seealso)
-			{
-				var cref = s.Attribute("cref")?.Value ?? "";
-				var href = s.Attribute("href")?.Value ?? "";
-				var description = s.Value.Trim();
-
-				xmlDoc.SeeAlso.Add(new XMLDoc.XMLSeeAlso(cref, href, description));
-			}
-
-			var examples = xml.Descendants("example").ToList();
-			foreach (var e in examples)
-			{
-				var description = RemoveXMLSyntax(e.Name.ToString(), e.ToString());
-
-				xmlDoc.Examples.Add(description);
-			}
+			xmlDoc.Examples.Add(description);
 		}
 
 		return xmlDoc;
