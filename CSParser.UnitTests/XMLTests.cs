@@ -10,6 +10,24 @@ public class XMLTests
 		_generator = new Generator();
 	}
 
+	// Issue #2 : XML can't be parse if there is a new line
+	[Test]
+	public void Issue2XML()
+	{
+		_generator.AddCode(@"
+namespace TestNamespace;
+/// <summary>
+		
+/// Test summary
+/// </summary>
+public class Test
+{
+}
+");
+
+		Assert.That(_generator.Namespaces[0].Classes[0].XmlDoc.Summary, Is.EqualTo("Test summary"));
+	}
+
 	[Test]
 	public void XMLToString()
 	{
