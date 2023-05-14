@@ -131,6 +131,17 @@ public partial class Generator
 			}
 
 			@class.XmlDoc = GetXMLDocumentation(cd);
+
+			var existingClass = classList.FirstOrDefault(x => x.Name == className);
+
+			if (existingClass != null)
+			{
+				existingClass.Methods.AddRange(GetMethods(cd));
+				existingClass.Properties.AddRange(GetProperties(cd));
+				existingClass.Fields.AddRange(GetFields(cd));
+				continue;
+			}
+
 			@class.Methods = GetMethods(cd);
 			@class.Properties = GetProperties(cd);
 			@class.Fields = GetFields(cd);
