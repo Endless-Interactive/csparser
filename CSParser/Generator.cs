@@ -9,7 +9,7 @@ namespace CSParser;
 public partial class Generator
 {
 	public static bool Debug;
-	private CSExclusions _exclusions = new();
+	public readonly CSExclusions Exclusions = new();
 	public List<CSInfo> Namespaces = new();
 
 	public Generator(string path = "")
@@ -26,7 +26,7 @@ public partial class Generator
 	/// <param name="modifier"></param>
 	public void Exclude(CSAccessModifier modifier)
 	{
-		_exclusions.Add(modifier);
+		Exclusions.Add(modifier);
 	}
 
 	/// <summary>
@@ -36,7 +36,7 @@ public partial class Generator
 	/// <param name="name"></param>
 	public void Exclude(CSExclusions.ExcludeType type, string name)
 	{
-		_exclusions.Add(type, name);
+		Exclusions.Add(type, name);
 	}
 
 	public void AddDirectory(string path)
@@ -77,7 +77,7 @@ public partial class Generator
 		{
 			var namespaceName = nd.Name.ToString();
 
-			if (_exclusions.IsNamespaceExcluded(namespaceName))
+			if (Exclusions.IsNamespaceExcluded(namespaceName))
 			{
 				Log($"Excluding namespace {namespaceName}");
 				continue;
@@ -97,7 +97,7 @@ public partial class Generator
 				Classes = GetClasses(root)
 			};
 
-			if (csInfo.IsAllExcluded(_exclusions))
+			if (csInfo.IsAllExcluded(Exclusions))
 			{
 				Log($"Excluding namespace {namespaceName} because all classes are excluded");
 				continue;
@@ -124,7 +124,7 @@ public partial class Generator
 
 			@class.SetModifiers(cd.Modifiers.ToString());
 
-			if (_exclusions.IsClassExcluded(@class))
+			if (Exclusions.IsClassExcluded(@class))
 			{
 				Log($"Excluding class {className}");
 				continue;
@@ -176,7 +176,7 @@ public partial class Generator
 
 			method.SetModifiers(modifiers);
 
-			if (_exclusions.IsMethodExcluded(method))
+			if (Exclusions.IsMethodExcluded(method))
 			{
 				Log($"Excluding method {method.Name}");
 				continue;
@@ -209,7 +209,7 @@ public partial class Generator
 
 			property.SetModifiers(modifiers);
 
-			if (_exclusions.IsPropertyExcluded(property))
+			if (Exclusions.IsPropertyExcluded(property))
 			{
 				Log($"Excluding property {property.Name}");
 				continue;
@@ -243,7 +243,7 @@ public partial class Generator
 
 			field.SetModifiers(modifiers);
 
-			if (_exclusions.IsFieldExcluded(field))
+			if (Exclusions.IsFieldExcluded(field))
 			{
 				Log($"Excluding field {field.Name}");
 				continue;
