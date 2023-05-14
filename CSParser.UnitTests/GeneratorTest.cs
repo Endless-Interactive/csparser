@@ -18,6 +18,19 @@ public class GeneratorTest
 	}
 
 	[Test]
+	public void GenerateWithDirectory()
+	{
+		_generator = new Generator("../../../Test");
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces, Has.Count.EqualTo(2));
+			Assert.That(_generator.Namespaces[0].Namespace, Is.EqualTo("TestNamespace"));
+			Assert.That(_generator.Namespaces[1].Namespace, Is.EqualTo("TestNamespace.SubTest"));
+		});
+	}
+
+	[Test]
 	public void GenerateWithCode()
 	{
 		_generator.AddCode(@"
