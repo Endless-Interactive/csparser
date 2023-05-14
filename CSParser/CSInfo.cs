@@ -24,6 +24,20 @@ public class CSObject
 		return Modifier.Length < 1 ? "" : $" {Modifier}";
 	}
 
+	public static string GetTypeAsString(string type, string value)
+	{
+		var defaultValue = value;
+
+		switch (type)
+		{
+			case "string":
+				defaultValue = $"\"{value}\"";
+				break;
+		}
+
+		return defaultValue;
+	}
+
 	public void SetModifiers(string mod)
 	{
 		var modList = mod.Split(" ");
@@ -78,21 +92,15 @@ public class XMLDoc
 	public string Summary { get; set; } = "";
 	public string Remarks { get; set; } = "";
 	public string Returns { get; set; } = "";
-	public List<XMLDocParam> Parameters { get; set; } = new();
-	public string ParamRef { get; set; } = "";
-	public string Exception { get; set; } = "";
+	public List<XMLDocParam> Parameters { get; } = new();
+	public List<XMLParamRef> ParamRefs { get; } = new();
+	public List<XMLException> Exceptions { get; } = new();
 	public string Value { get; set; } = "";
-	public string Para { get; set; } = "";
-	public string List { get; set; } = "";
-	public string C { get; set; } = "";
-	public string Code { get; set; } = "";
-	public string Example { get; set; } = "";
+	public List<string> Examples { get; } = new();
 	public string InheritDoc { get; set; } = "";
 	public string Include { get; set; } = "";
-	public string See { get; set; } = "";
-	public string SeeAlso { get; set; } = "";
-	public string Cref { get; set; } = "";
-	public string Href { get; set; } = "";
+	public List<XMLSee> See { get; } = new();
+	public List<XMLSeeAlso> SeeAlso { get; } = new();
 	public string TypeParam { get; set; } = "";
 	public string TypeParamRef { get; set; } = "";
 
@@ -103,12 +111,58 @@ public class XMLDoc
 
 	public class XMLDocParam
 	{
-		public string Description;
-		public string Name;
+		public string Description, Name;
 
 		public XMLDocParam(string name, string description)
 		{
 			Name = name;
+			Description = description;
+		}
+	}
+
+	public class XMLParamRef
+	{
+		public string Description, Name;
+
+		public XMLParamRef(string name, string description)
+		{
+			Name = name;
+			Description = description;
+		}
+	}
+
+	public class XMLException
+	{
+		public string Cref, Description;
+
+		public XMLException(string cref, string description)
+		{
+			Cref = cref;
+			Description = description;
+		}
+	}
+
+	public class XMLSee
+	{
+		public string Cref, Href, Description, LangWord;
+
+		public XMLSee(string cref, string href, string description, string langWord)
+		{
+			Cref = cref;
+			Href = href;
+			Description = description;
+			LangWord = langWord;
+		}
+	}
+
+	public class XMLSeeAlso
+	{
+		public string Cref, Href, Description;
+
+		public XMLSeeAlso(string cref, string href, string description)
+		{
+			Cref = cref;
+			Href = href;
 			Description = description;
 		}
 	}
@@ -127,29 +181,36 @@ public class CSMethod : CSObject
 
 public class CSProperty : CSObject
 {
-	public string ReturnType;
+	public string DefaultValue = "";
+	public string Type;
+
+	public override string ToString()
+	{
+		return $"{FullModifier} {Type} {Name}";
+	}
 }
 
 public class CSField : CSObject
 {
+	public string DefaultValue = "";
 	public string Type;
+
+	public override string ToString()
+	{
+		var defaultText = DefaultValue.Length > 0 ? $" = {GetTypeAsString(Type, DefaultValue)}" : "";
+		return $"{FullModifier} {Type} {Name}{defaultText}";
+	}
 }
 
 public class CSParameter
 {
-	public string Name, Type, DefaultValue;
+	public string DefaultValue = "";
+	public string Name, Type;
 	public bool Optional;
 
 	public override string ToString()
 	{
-		var defaultValue = DefaultValue;
-
-		switch (Type)
-		{
-			case "string":
-				defaultValue = $"\"{defaultValue}\"";
-				break;
-		}
+		var defaultValue = CSObject.GetTypeAsString(Type, DefaultValue);
 
 		return $"{Type} {Name}{( Optional ? $" = {defaultValue}" : "" )}";
 	}
