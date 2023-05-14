@@ -3,7 +3,7 @@ namespace CSParser.UnitTests;
 public class NamespaceTests
 {
 	private Generator _generator;
-	
+
 	[SetUp]
 	public void Setup()
 	{
@@ -21,12 +21,12 @@ namespace Test
 
 		Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
 	}
-	
+
 	[Test]
 	public void NamespaceIsExcluded()
 	{
 		_generator.Exclude(CSExclusions.ExcludeType.Namespace, "^Test$");
-		
+
 		_generator.AddCode(@"
 namespace Test	
 {
@@ -34,6 +34,39 @@ namespace Test
 ");
 
 		Assert.That(_generator.Namespaces, Has.Count.EqualTo(0));
+	}
+
+	[Test]
+	public void MultipleNamespacesRendered()
+	{
+		_generator.AddCode(@"
+namespace Test	
+{
+	public class TestClass
+	{
+	}
+}
+
+namespace Test2
+{
+	public class TestClass2
+	{
+	}
+}
+");
+
+		Assert.That(_generator.Namespaces, Has.Count.EqualTo(2));
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces[0].Namespace, Is.EqualTo("Test"));
+			Assert.That(_generator.Namespaces[1].Namespace, Is.EqualTo("Test2"));
+
+			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Name, Is.EqualTo("TestClass"));
+
+			Assert.That(_generator.Namespaces[1].Classes, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[1].Classes[0].Name, Is.EqualTo("TestClass2"));
+		});
 	}
 
 	[Test]
@@ -59,7 +92,7 @@ namespace Test2
 	public void ExcludeMultipleNamespaces()
 	{
 		_generator.Exclude(CSExclusions.ExcludeType.Namespace, "^Test");
-		
+
 		_generator.AddCode(@"
 namespace Test	
 {
@@ -77,7 +110,7 @@ namespace RandomTest
 {
 }
 ");
-		
+
 		Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
 		Assert.That(_generator.Namespaces[0].Namespace, Is.EqualTo("RandomTest"));
 	}
