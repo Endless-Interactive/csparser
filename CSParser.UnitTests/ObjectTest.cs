@@ -23,7 +23,7 @@ public class ObjectTest
 	[Test]
 	public void ObjectRendersWithModifier()
 	{
-		_csObject.Modifier = "static";
+		_csObject.SetModifiers("public static");
 
 		Assert.That(_csObject.ToString(), Is.EqualTo("public static test"));
 	}
@@ -118,5 +118,29 @@ public class ObjectTest
 	public void GetModifierPrivateProtected()
 	{
 		Assert.That(CSObject.GetModifier(CSAccessModifier.PrivateProtected), Is.EqualTo("private protected"));
+	}
+
+	[Test]
+	public void SingleModifier()
+	{
+		_csObject = new CSObject
+		{
+			Name = "test"
+		};
+
+		_csObject.SetModifiers("public static");
+		Assert.That(_csObject.Modifiers, Is.EqualTo(CSModifier.Static));
+	}
+
+	[Test]
+	public void MultipleModifiers()
+	{
+		_csObject = new CSObject
+		{
+			Name = "test"
+		};
+
+		_csObject.SetModifiers("public static async");
+		Assert.That(_csObject.Modifiers, Is.EqualTo(CSModifier.Static | CSModifier.Async));
 	}
 }
