@@ -184,7 +184,7 @@ public partial class Generator
 				method.Parameters.Add(new CSParameter
 				{
 					Name = ps.Identifier.ToString(),
-					Type = ps.Type.ToString(),
+					Type = ps.Type?.ToString(),
 					Optional = ps.Default != null,
 					DefaultValue = ps.Default?.Value.ToString() ?? ""
 				});
@@ -275,8 +275,8 @@ public partial class Generator
 	private XMLDoc GetXMLDocumentation(CSharpSyntaxNode md)
 	{
 		return GetXMLDocumentation(md.GetLeadingTrivia()
-			.Where(x => x.Kind() == SyntaxKind.SingleLineDocumentationCommentTrivia ||
-			            x.Kind() == SyntaxKind.MultiLineDocumentationCommentTrivia).Select(x => x.ToString()).ToList());
+			.Where(x => x.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) ||
+			            x.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia)).Select(x => x.ToString()).ToList());
 	}
 
 	private string RemoveXMLSyntax(string name, string xml)

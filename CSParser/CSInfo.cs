@@ -7,24 +7,49 @@ public class CSClass : CSObject
 	public List<CSField> Fields = new();
 	public List<string> Inherits = new();
 	public List<CSMethod> Methods = new();
-	public string Name;
 	public List<CSProperty> Properties = new();
+	public bool IsPartial { get; private set; }
+
+	protected override void SetupModifiers(string[] mods)
+	{
+		var replaceMods = mods;
+
+		if (mods.Contains("partial"))
+		{
+			IsPartial = true;
+			replaceMods = mods.Where(mod => mod != "partial").ToArray();
+		}
+
+		base.SetupModifiers(replaceMods);
+	}
+
+	protected override void SetupAccessModifier(string accessModifier)
+	{
+		if (accessModifier == "partial")
+		{
+			AccessModifier = CSAccessModifier.Private;
+			return;
+		}
+
+		base.SetupAccessModifier(accessModifier);
+	}
 }
 
 public class CSObject
 {
 	public CSAccessModifier AccessModifier;
-	public string Modifier = "";
+	public CSModifier Modifiers = CSModifier.None;
+	public string ModifierString = "";
 	public string Name = "";
-	public XMLDoc XmlDoc;
-	public string FullModifier => $"{GetModifier(AccessModifier)}{GetModifier()}";
+	public XMLDoc XmlDoc = new();
+	public string FullModifier => $"{GetModifier(AccessModifier)}{GetModifiers()}";
 
-	private string GetModifier()
+	private string GetModifiers()
 	{
-		return Modifier.Length < 1 ? "" : $" {Modifier}";
+		return ModifierString.Length < 1 ? "" : $" {ModifierString}";
 	}
 
-	public static string GetTypeAsString(string type, string value)
+	public static string GetTypeAsString(string? type, string value)
 	{
 		var defaultValue = value;
 
@@ -57,18 +82,68 @@ public class CSObject
 
 		mod = regex.Replace(mod, "");
 
-		AccessModifier = modCheck.ToLower() switch
-		{
-			"public" => CSAccessModifier.Public,
-			"private" => CSAccessModifier.Private,
-			"protected" => CSAccessModifier.Protected,
-			"internal" => CSAccessModifier.Internal,
-			"protected internal" => CSAccessModifier.ProtectedInternal,
-			"private protected" => CSAccessModifier.PrivateProtected,
-			_ => throw new Exception($"Unknown access modifier: {modCheck}")
-		};
+		ModifierString = mod;
 
-		Modifier = mod;
+		var accessModifier = modCheck.ToLower();
+
+		SetupAccessModifier(accessModifier);
+
+		if (mod.Length == 0) return;
+
+		var mods = mod.Split(" ");
+
+		if (mods.Length == 0) return;
+
+		SetupModifiers(mods);
+	}
+
+	protected virtual void SetupAccessModifier(string accessModifier)
+	{
+		if (ConvertModifier(accessModifier) != CSModifier.None || accessModifier.Length == 0)
+			AccessModifier = CSAccessModifier.Private;
+		else
+			AccessModifier = accessModifier switch
+			{
+				"public" => CSAccessModifier.Public,
+				"private" => CSAccessModifier.Private,
+				"protected" => CSAccessModifier.Protected,
+				"internal" => CSAccessModifier.Internal,
+				"protected internal" => CSAccessModifier.ProtectedInternal,
+				"private protected" => CSAccessModifier.PrivateProtected,
+				_ => throw new Exception($"Unknown access modifier: {accessModifier}")
+			};
+	}
+
+	public static CSModifier ConvertModifier(string mod)
+	{
+		return mod.ToLower() switch
+		{
+			"abstract" => CSModifier.Abstract,
+			"async" => CSModifier.Async,
+			"const" => CSModifier.Const,
+			"event" => CSModifier.Event,
+			"extern" => CSModifier.Extern,
+			"in" => CSModifier.In,
+			"new" => CSModifier.New,
+			"out" => CSModifier.Out,
+			"override" => CSModifier.Override,
+			"readonly" => CSModifier.Readonly,
+			"sealed" => CSModifier.Sealed,
+			"static" => CSModifier.Static,
+			"unsafe" => CSModifier.Unsafe,
+			"virtual" => CSModifier.Virtual,
+			"volatile" => CSModifier.Volatile,
+			_ => CSModifier.None
+		};
+	}
+
+	protected virtual void SetupModifiers(string[] mods)
+	{
+		foreach (var modifier in mods)
+			Modifiers |= ConvertModifier(modifier);
+
+		if (Modifiers.HasFlag(CSModifier.None))
+			Modifiers &= ~CSModifier.None;
 	}
 
 	public static string GetModifier(CSAccessModifier modifier)
@@ -171,7 +246,7 @@ public class XMLDoc
 public class CSMethod : CSObject
 {
 	public List<CSParameter> Parameters = new();
-	public string ReturnType;
+	public string ReturnType = "";
 
 	public override string ToString()
 	{
@@ -182,7 +257,7 @@ public class CSMethod : CSObject
 public class CSProperty : CSObject
 {
 	public string DefaultValue = "";
-	public string Type;
+	public string Type = "";
 
 	public override string ToString()
 	{
@@ -193,7 +268,7 @@ public class CSProperty : CSObject
 public class CSField : CSObject
 {
 	public string DefaultValue = "";
-	public string Type;
+	public string? Type = "";
 
 	public override string ToString()
 	{
@@ -205,8 +280,9 @@ public class CSField : CSObject
 public class CSParameter
 {
 	public string DefaultValue = "";
-	public string Name, Type;
+	public string Name = "";
 	public bool Optional;
+	public string? Type = "";
 
 	public override string ToString()
 	{
@@ -238,6 +314,27 @@ public enum CSAccessModifier
 	Internal,
 	ProtectedInternal,
 	PrivateProtected
+}
+
+[Flags]
+public enum CSModifier
+{
+	None,
+	Abstract,
+	Async,
+	Const,
+	Event,
+	Extern,
+	In,
+	New,
+	Out,
+	Override,
+	Readonly,
+	Sealed,
+	Static,
+	Unsafe,
+	Virtual,
+	Volatile
 }
 
 public class CSExclusions

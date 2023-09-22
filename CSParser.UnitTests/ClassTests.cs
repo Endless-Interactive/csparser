@@ -30,6 +30,7 @@ namespace Test
 		{
 			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[0].Classes[0].Name, Is.EqualTo("TestClass"));
+			Assert.That(_generator.Namespaces[0].Classes[0].IsPartial, Is.EqualTo(true));
 		});
 	}
 
