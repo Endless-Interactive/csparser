@@ -25,7 +25,7 @@ public class CSClass : CSObject
 
 	protected override void SetupAccessModifier(string accessModifier)
 	{
-		if (ConvertModifier(accessModifier) != CSModifier.None)
+		if (accessModifier is "partial" or "file")
 		{
 			AccessModifier = CSAccessModifier.Private;
 			return;
