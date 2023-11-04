@@ -29,6 +29,14 @@ public class ObjectTest
 	}
 
 	[Test]
+	public void ObjectRendersWhenSettingFileModifier()
+	{
+		_csObject.SetModifiers("file");
+
+		Assert.That(_csObject.ToString(), Is.EqualTo("file test"));
+	}
+
+	[Test]
 	public void ObjectRendersWhenSettingProtectedModifier()
 	{
 		_csObject.SetModifiers("protected");

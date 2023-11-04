@@ -25,7 +25,7 @@ public class CSClass : CSObject
 
 	protected override void SetupAccessModifier(string accessModifier)
 	{
-		if (accessModifier == "partial")
+		if (ConvertModifier(accessModifier) != CSModifier.None)
 		{
 			AccessModifier = CSAccessModifier.Private;
 			return;
@@ -104,6 +104,7 @@ public class CSObject
 		else
 			AccessModifier = accessModifier switch
 			{
+				"file" => CSAccessModifier.File,
 				"public" => CSAccessModifier.Public,
 				"private" => CSAccessModifier.Private,
 				"protected" => CSAccessModifier.Protected,
@@ -308,6 +309,7 @@ public class CSInfo
 
 public enum CSAccessModifier
 {
+	File,
 	Public,
 	Private,
 	Protected,
