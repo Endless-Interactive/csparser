@@ -91,7 +91,22 @@ public partial class Generator
 
 			if (existingInfo != null)
 			{
-				existingInfo.Classes.AddRange(GetClasses(node));
+				var classes = GetClasses(node);
+				foreach (var @class in classes)
+				{
+					var existingClass = existingInfo.Classes.FirstOrDefault(x => x.Name == @class.Name);
+
+					if (existingClass != null)
+					{
+						existingClass.Methods.AddRange(@class.Methods);
+						existingClass.Properties.AddRange(@class.Properties);
+						existingClass.Fields.AddRange(@class.Fields);
+						continue;
+					}
+
+					existingInfo.Classes.Add(@class);
+				}
+
 				continue;
 			}
 
