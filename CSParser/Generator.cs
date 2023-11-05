@@ -161,6 +161,8 @@ public partial class Generator
 				continue;
 			}
 
+			// foreach (var p in GetProperties(cd)) Console.WriteLine($"Class: {@class.Name} Property: {p.Name}");
+
 			@class.Methods = GetMethods(cd);
 			@class.Properties = GetProperties(cd);
 			@class.Fields = GetFields(cd);
@@ -173,15 +175,16 @@ public partial class Generator
 
 	private static void Log(string message)
 	{
-		if (Debug)
-			Console.WriteLine(message);
+		if (!Debug) return;
+
+		Console.WriteLine(message);
 	}
 
 	private List<CSMethod> GetMethods(SyntaxNode root)
 	{
 		var methodList = new List<CSMethod>();
 
-		var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToList();
+		var methods = root.ChildNodes().OfType<MethodDeclarationSyntax>().ToList();
 
 		foreach (var md in methods)
 		{
@@ -224,7 +227,7 @@ public partial class Generator
 	{
 		var propertyList = new List<CSProperty>();
 
-		var properties = root.DescendantNodes().OfType<PropertyDeclarationSyntax>().ToList();
+		var properties = root.ChildNodes().OfType<PropertyDeclarationSyntax>().ToList();
 
 		foreach (var pd in properties)
 		{
@@ -257,12 +260,11 @@ public partial class Generator
 	{
 		var fieldList = new List<CSField>();
 
-		var fields = root.DescendantNodes().OfType<FieldDeclarationSyntax>().ToList();
+		var fields = root.ChildNodes().OfType<FieldDeclarationSyntax>().ToList();
 
 		foreach (var fd in fields)
 		{
 			var modifiers = fd.Modifiers.ToString();
-
 
 			var field = new CSField
 			{
