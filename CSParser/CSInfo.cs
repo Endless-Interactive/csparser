@@ -35,6 +35,44 @@ public class CSClass : CSObject
 	}
 }
 
+public class CSEnum : CSObjectWithType
+{
+	public List<CSEnumValue> Values = new();
+
+	public override string ToString()
+	{
+		return !string.IsNullOrWhiteSpace(Type) ? $"{FullModifier} enum {Name} : {Type}" : $"{FullModifier} enum {Name}";
+	}
+}
+
+public class CSEnumValue
+{
+	public string Name = "";
+	public string Value = "";
+
+	public override string ToString()
+	{
+		return Value.Length == 0 ? Name : $"{Name} = {Value}";
+	}
+}
+
+public class CSInterface : CSObjectWithType
+{
+	public List<CSField> Fields = new();
+	public List<CSMethod> Methods = new();
+	public List<CSProperty> Properties = new();
+
+	public override string ToString()
+	{
+		return !string.IsNullOrWhiteSpace(Type) ? $"{FullModifier} interface {Name} : {Type}" : $"{FullModifier} interface {Name}";
+	}
+}
+
+public class CSObjectWithType : CSObject
+{
+	public string Type = "";
+}
+
 public class CSObject
 {
 	public CSAccessModifier AccessModifier;
@@ -296,6 +334,8 @@ public class CSParameter
 public class CSInfo
 {
 	public List<CSClass> Classes = new();
+	public List<CSEnum> Enums = new();
+	public List<CSInterface> Interfaces = new();
 	public string? Namespace { get; set; }
 
 	public bool IsAllExcluded(CSExclusions exclusions)
@@ -345,7 +385,9 @@ public class CSExclusions
 	{
 		Namespace,
 		Class,
-		Method
+		Method,
+		Enum,
+		Interface
 	}
 
 	public List<string> Classes = new();
@@ -392,6 +434,16 @@ public class CSExclusions
 	public bool IsClassExcluded(CSClass @class)
 	{
 		return Classes.Any(cls => new Regex(cls).IsMatch(@class.Name)) || IsAccessModifierExcluded(@class.AccessModifier);
+	}
+
+	public bool IsEnumExcluded(CSEnum @enum)
+	{
+		return Classes.Any(cls => new Regex(cls).IsMatch(@enum.Name)) || IsAccessModifierExcluded(@enum.AccessModifier);
+	}
+
+	public bool IsInterfaceExcluded(CSInterface @interface)
+	{
+		return Classes.Any(cls => new Regex(cls).IsMatch(@interface.Name)) || IsAccessModifierExcluded(@interface.AccessModifier);
 	}
 
 	public bool IsPropertyExcluded(CSProperty property)

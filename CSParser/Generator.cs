@@ -113,7 +113,9 @@ public partial class Generator
 			var csInfo = new CSInfo
 			{
 				Namespace = namespaceName,
-				Classes = GetClasses(node)
+				Classes = GetClasses(node),
+				Enums = GetEnums(node),
+				Interfaces = GetInterfaces(node)
 			};
 
 			if (csInfo.IsAllExcluded(Exclusions))
@@ -171,6 +173,81 @@ public partial class Generator
 		}
 
 		return classList;
+	}
+
+	private List<CSEnum> GetEnums(SyntaxNode root)
+	{
+		var enumList = new List<CSEnum>();
+
+		var enums = root.DescendantNodes().OfType<EnumDeclarationSyntax>().ToList();
+
+		foreach (var ed in enums)
+		{
+			var enumName = ed.Identifier.ToString();
+			var enumType = ed.BaseList?.Types.FirstOrDefault()?.Type.ToString() ?? "";
+
+			var csEnum = new CSEnum
+			{
+				Name = enumName,
+				Type = enumType
+			};
+
+			csEnum.SetModifiers(ed.Modifiers.ToString());
+
+			if (Exclusions.IsEnumExcluded(csEnum))
+			{
+				Log($"Excluding enum {enumName}");
+				continue;
+			}
+
+			csEnum.XmlDoc = GetXMLDocumentation(ed);
+
+			foreach (var ev in ed.Members.OfType<EnumMemberDeclarationSyntax>())
+				csEnum.Values.Add(new CSEnumValue
+				{
+					Name = ev.Identifier.ToString(),
+					Value = ev.EqualsValue?.Value.ToString() ?? ""
+				});
+
+			enumList.Add(csEnum);
+		}
+
+		return enumList;
+	}
+
+	private List<CSInterface> GetInterfaces(SyntaxNode root)
+	{
+		var interfaceList = new List<CSInterface>();
+
+		var interfaces = root.DescendantNodes().OfType<InterfaceDeclarationSyntax>().ToList();
+
+		foreach (var id in interfaces)
+		{
+			var interfaceName = id.Identifier.ToString();
+
+			var csInterface = new CSInterface
+			{
+				Name = interfaceName
+			};
+
+			csInterface.SetModifiers(id.Modifiers.ToString());
+
+			if (Exclusions.IsInterfaceExcluded(csInterface))
+			{
+				Log($"Excluding interface {interfaceName}");
+				continue;
+			}
+
+
+			csInterface.XmlDoc = GetXMLDocumentation(id);
+			csInterface.Methods = GetMethods(id);
+			csInterface.Properties = GetProperties(id);
+			csInterface.Fields = GetFields(id);
+
+			interfaceList.Add(csInterface);
+		}
+
+		return interfaceList;
 	}
 
 	private static void Log(string message)
