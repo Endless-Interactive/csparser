@@ -149,7 +149,7 @@ public partial class Generator
 					existingInfo.Enums.Add(@enum);
 				}
 
-				var interfaces = GetInterfaces(node);
+				var interfaces = GetInterfaces(node, semanticModel);
 				foreach (var @interface in interfaces)
 				{
 					var existingInterface = existingInfo.Interfaces.FirstOrDefault(x => x.Name == @interface.Name);
@@ -172,7 +172,7 @@ public partial class Generator
 				Namespace = namespaceName,
 				Classes = GetClasses(node, semanticModel),
 				Enums = GetEnums(node),
-				Interfaces = GetInterfaces(node)
+				Interfaces = GetInterfaces(node, semanticModel)
 			};
 
 			if (csInfo.IsAllExcluded(Exclusions))
@@ -201,22 +201,17 @@ public partial class Generator
 					.Select(x =>
 					{
 						var symbol = semanticModel.GetSymbolInfo(x.Type).Symbol;
-						if (symbol is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.ContainingNamespace is not null)
-							// Use the custom display format to get fully qualified name
+						if (symbol is INamedTypeSymbol { ContainingNamespace: not null } namedTypeSymbol)
 							return namedTypeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
 
-						// Fallback: try to get the full type string as written in source
 						var typeString = x.Type.ToString();
 
-						// If it's a qualified name (contains dots), return as-is
 						if (typeString.Contains('.')) return typeString;
 
-						// For unqualified names, we need to check using statements to resolve the full name
 						var typeInfo = semanticModel.GetTypeInfo(x.Type);
-						if (typeInfo.Type is INamedTypeSymbol typeSymbol && typeSymbol.ContainingNamespace is not null)
+						if (typeInfo.Type is INamedTypeSymbol { ContainingNamespace: not null } typeSymbol)
 							return typeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
 
-						// Last resort: return the type name as-is
 						return typeString;
 					})
 					.ToList() ?? new List<string>()
@@ -236,15 +231,15 @@ public partial class Generator
 
 			if (existingClass != null)
 			{
-				existingClass.Methods.AddRange(GetMethods(cd));
-				existingClass.Properties.AddRange(GetProperties(cd));
-				existingClass.Fields.AddRange(GetFields(cd));
+				existingClass.Methods.AddRange(GetMethods(cd, semanticModel));
+				existingClass.Properties.AddRange(GetProperties(cd, semanticModel));
+				existingClass.Fields.AddRange(GetFields(cd, semanticModel));
 				continue;
 			}
 
-			@class.Methods = GetMethods(cd);
-			@class.Properties = GetProperties(cd);
-			@class.Fields = GetFields(cd);
+			@class.Methods = GetMethods(cd, semanticModel);
+			@class.Properties = GetProperties(cd, semanticModel);
+			@class.Fields = GetFields(cd, semanticModel);
 
 			classList.Add(@class);
 		}
@@ -292,7 +287,7 @@ public partial class Generator
 		return enumList;
 	}
 
-	private List<CSInterface> GetInterfaces(SyntaxNode root)
+	private List<CSInterface> GetInterfaces(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var interfaceList = new List<CSInterface>();
 
@@ -316,8 +311,8 @@ public partial class Generator
 			}
 
 			csInterface.XmlDoc = GetXMLDocumentation(id);
-			csInterface.Methods = GetMethods(id);
-			csInterface.Properties = GetProperties(id);
+			csInterface.Methods = GetMethods(id, semanticModel);
+			csInterface.Properties = GetProperties(id, semanticModel);
 
 			interfaceList.Add(csInterface);
 		}
@@ -332,7 +327,7 @@ public partial class Generator
 		Console.WriteLine(message);
 	}
 
-	private List<CSMethod> GetMethods(SyntaxNode root)
+	private List<CSMethod> GetMethods(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var methodList = new List<CSMethod>();
 
@@ -344,20 +339,30 @@ public partial class Generator
 
 			var method = new CSMethod
 			{
-				Name = md.Identifier.ToString(),
-				ReturnType = md.ReturnType.ToString()
+				Name = md.Identifier.ToString()
 			};
+
+			var returnType = semanticModel.GetTypeInfo(md.ReturnType).Type;
+			method.ReturnType = returnType != null ? returnType.ToDisplayString(FullyQualifiedFormatCustom) : md.ReturnType.ToString();
 
 			var parameters = md.ParameterList.Parameters;
 
 			foreach (var ps in parameters)
-				method.Parameters.Add(new CSParameter
+			{
+				var param = new CSParameter
 				{
 					Name = ps.Identifier.ToString(),
-					Type = ps.Type?.ToString(),
 					Optional = ps.Default != null,
 					DefaultValue = ps.Default?.Value.ToString() ?? ""
-				});
+				};
+
+				if (ps.Type != null)
+					param.Type = semanticModel.GetTypeInfo(ps.Type).Type?.ToDisplayString(FullyQualifiedFormatCustom) ?? ps.Type.ToString();
+				else
+					param.Type = ps.Type?.ToString();
+
+				method.Parameters.Add(param);
+			}
 
 			method.SetModifiers(modifiers);
 
@@ -375,7 +380,7 @@ public partial class Generator
 		return methodList;
 	}
 
-	private List<CSProperty> GetProperties(SyntaxNode root)
+	private List<CSProperty> GetProperties(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var propertyList = new List<CSProperty>();
 
@@ -388,9 +393,11 @@ public partial class Generator
 			var property = new CSProperty
 			{
 				Name = pd.Identifier.ToString(),
-				Type = pd.Type.ToString(),
 				DefaultValue = pd.Initializer?.Value.ToString().Trim('"') ?? ""
 			};
+
+			var typeInfo = semanticModel.GetTypeInfo(pd.Type);
+			property.Type = typeInfo.Type?.ToDisplayString(FullyQualifiedFormatCustom) ?? pd.Type.ToString();
 
 			property.SetModifiers(modifiers);
 
@@ -408,7 +415,7 @@ public partial class Generator
 		return propertyList;
 	}
 
-	private List<CSField> GetFields(SyntaxNode root)
+	private List<CSField> GetFields(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var fieldList = new List<CSField>();
 
@@ -421,9 +428,11 @@ public partial class Generator
 			var field = new CSField
 			{
 				Name = fd.Declaration.Variables.First().Identifier.ToString(),
-				Type = fd.Declaration.Type.ToString(),
 				DefaultValue = fd.Declaration.Variables.First().Initializer?.Value.ToString().Trim('"') ?? ""
 			};
+
+			var typeInfo = semanticModel.GetTypeInfo(fd.Declaration.Type);
+			field.Type = typeInfo.Type?.ToDisplayString(FullyQualifiedFormatCustom) ?? fd.Declaration.Type.ToString();
 
 			field.SetModifiers(modifiers);
 

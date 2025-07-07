@@ -104,8 +104,8 @@ public class Test
 		Assert.Multiple(() =>
 		{
 			Assert.That(_generator.Namespaces[0].Classes[0].Methods, Has.Count.EqualTo(2));
-			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public void TestMethod()"));
-			Assert.That(_generator.Namespaces[0].Classes[0].Methods[1].ToString(), Is.EqualTo("internal void TestInternalMethod()"));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public System.Void TestMethod()"));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[1].ToString(), Is.EqualTo("internal System.Void TestInternalMethod()"));
 		});
 	}
 
@@ -132,7 +132,7 @@ public class Test
 		Assert.Multiple(() =>
 		{
 			Assert.That(_generator.Namespaces[0].Classes[0].Methods, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public void TestMethod()"));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public System.Void TestMethod()"));
 		});
 	}
 
@@ -155,7 +155,49 @@ public class Test
 		Assert.Multiple(() =>
 		{
 			Assert.That(_generator.Namespaces[0].Classes[0].Methods, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(), Is.EqualTo("public void TestMethod(string str)"));
+			Assert.That(_generator.Namespaces[0].Classes[0].Methods[0].ToString(),
+				Is.EqualTo("public System.Void TestMethod(System.String str)"));
+		});
+	}
+
+	[Test]
+	public void MethodTypeHasFullNameSpace()
+	{
+		_generator.AddCode("""
+
+		                   namespace RandomNamespace.SomethingRandom;
+
+		                   public class NewClass
+		                   {
+		                   	public int SomeProperty { get; set; }
+		                   }
+
+		                   """);
+		_generator.AddCode("""
+
+		                   using RandomNamespace.SomethingRandom;
+		                   namespace TestNamespace;
+
+		                   public class DerivedClass : NewClass
+		                   {
+		                       public void TestMethod(NewClass data)
+		                       {
+		                       }
+
+		                       public int TestProperty { get; set; }
+		                   }
+
+		                   """);
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces, Has.Count.EqualTo(2));
+			Assert.That(_generator.Namespaces[1].Classes, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[1].Classes[0].Name, Is.EqualTo("DerivedClass"));
+			Assert.That(_generator.Namespaces[1].Classes[0].Methods, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[1].Classes[0].Methods[0].Parameters, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[1].Classes[0].Methods[0].Parameters[0].Type,
+				Is.EqualTo("RandomNamespace.SomethingRandom.NewClass"));
 		});
 	}
 }

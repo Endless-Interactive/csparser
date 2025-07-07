@@ -69,22 +69,20 @@ public class Test
 			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[0].Classes[0].Fields, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Classes[0].Fields[0].ToString(), Is.EqualTo("public string TestField"));
+			Assert.That(_generator.Namespaces[0].Classes[0].Fields[0].ToString(), Is.EqualTo("public System.String TestField"));
 		});
 	}
 
 	[Test]
 	public void FieldRendersWithDefaultValueWithCode()
 	{
-		var value = "\"test\"";
-
-		_generator.AddCode($@"
+		_generator.AddCode(@"
 namespace TestNamespace;
 
 public class Test
-{{
-	public string TestField = {value};
-}}
+{
+	public string TestField = ""test"";
+}
 ");
 
 		Assert.Multiple(() =>
@@ -92,7 +90,8 @@ public class Test
 			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[0].Classes[0].Fields, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Classes[0].Fields[0].ToString(), Is.EqualTo($"public string TestField = {value}"));
+			Assert.That(_generator.Namespaces[0].Classes[0].Fields[0].ToString(),
+				Is.EqualTo("public System.String TestField = test"));
 		});
 	}
 
