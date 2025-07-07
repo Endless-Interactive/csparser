@@ -66,16 +66,12 @@ public partial class Generator
 		var tree = CSharpSyntaxTree.ParseText(code);
 		_syntaxTrees.Add(tree);
 
-		var references = new List<MetadataReference>
-		{
-			MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-			MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
-			MetadataReference.CreateFromFile(typeof(List<>).Assembly.Location),
-			MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
-		};
+		var referencedAssemblies = AppDomain.CurrentDomain.GetAssemblies()
+			.Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
+			.Select(a => MetadataReference.CreateFromFile(a.Location));
 
 		_compilation = CSharpCompilation.Create("CSParserAnalysis")
-			.AddReferences(references)
+			.AddReferences(referencedAssemblies)
 			.AddSyntaxTrees(_syntaxTrees);
 
 		ProcessSyntaxTree(tree, code);
@@ -185,6 +181,31 @@ public partial class Generator
 		}
 	}
 
+	private string ResolveFullyQualifiedTypeName(TypeSyntax typeSyntax, SemanticModel semanticModel)
+	{
+		var symbol = semanticModel.GetSymbolInfo(typeSyntax).Symbol;
+		if (symbol is INamedTypeSymbol { ContainingNamespace: not null } namedTypeSymbol)
+			return namedTypeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
+
+		var typeString = typeSyntax.ToString();
+
+		var declaredSymbol = semanticModel.LookupSymbols(typeSyntax.SpanStart, name: typeString)
+			.OfType<INamedTypeSymbol>()
+			.FirstOrDefault();
+
+		if (declaredSymbol?.ContainingNamespace is not null)
+			return declaredSymbol.ToDisplayString(FullyQualifiedFormatCustom);
+
+		if (typeString.Contains('.'))
+			return typeString;
+
+		var typeInfo = semanticModel.GetTypeInfo(typeSyntax);
+		if (typeInfo.Type is INamedTypeSymbol { ContainingNamespace: not null } typeSymbol)
+			return typeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
+
+		return typeString;
+	}
+
 	private List<CSClass> GetClasses(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var classes = root.DescendantNodes().OfType<ClassDeclarationSyntax>().ToList();
@@ -198,22 +219,7 @@ public partial class Generator
 			{
 				Name = className,
 				Inherits = cd.BaseList?.Types
-					.Select(x =>
-					{
-						var symbol = semanticModel.GetSymbolInfo(x.Type).Symbol;
-						if (symbol is INamedTypeSymbol { ContainingNamespace: not null } namedTypeSymbol)
-							return namedTypeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
-
-						var typeString = x.Type.ToString();
-
-						if (typeString.Contains('.')) return typeString;
-
-						var typeInfo = semanticModel.GetTypeInfo(x.Type);
-						if (typeInfo.Type is INamedTypeSymbol { ContainingNamespace: not null } typeSymbol)
-							return typeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
-
-						return typeString;
-					})
+					.Select(t => ResolveFullyQualifiedTypeName(t.Type, semanticModel))
 					.ToList() ?? new List<string>()
 			};
 
@@ -339,11 +345,9 @@ public partial class Generator
 
 			var method = new CSMethod
 			{
-				Name = md.Identifier.ToString()
+				Name = md.Identifier.ToString(),
+				ReturnType = ResolveFullyQualifiedTypeName(md.ReturnType, semanticModel)
 			};
-
-			var returnType = semanticModel.GetTypeInfo(md.ReturnType).Type;
-			method.ReturnType = returnType != null ? returnType.ToDisplayString(FullyQualifiedFormatCustom) : md.ReturnType.ToString();
 
 			var parameters = md.ParameterList.Parameters;
 
@@ -356,10 +360,8 @@ public partial class Generator
 					DefaultValue = ps.Default?.Value.ToString() ?? ""
 				};
 
-				if (ps.Type != null)
-					param.Type = semanticModel.GetTypeInfo(ps.Type).Type?.ToDisplayString(FullyQualifiedFormatCustom) ?? ps.Type.ToString();
-				else
-					param.Type = ps.Type?.ToString();
+				if (ps.Type is not null)
+					param.Type = ResolveFullyQualifiedTypeName(ps.Type, semanticModel);
 
 				method.Parameters.Add(param);
 			}
@@ -396,8 +398,7 @@ public partial class Generator
 				DefaultValue = pd.Initializer?.Value.ToString().Trim('"') ?? ""
 			};
 
-			var typeInfo = semanticModel.GetTypeInfo(pd.Type);
-			property.Type = typeInfo.Type?.ToDisplayString(FullyQualifiedFormatCustom) ?? pd.Type.ToString();
+			property.Type = ResolveFullyQualifiedTypeName(pd.Type, semanticModel);
 
 			property.SetModifiers(modifiers);
 
@@ -431,8 +432,7 @@ public partial class Generator
 				DefaultValue = fd.Declaration.Variables.First().Initializer?.Value.ToString().Trim('"') ?? ""
 			};
 
-			var typeInfo = semanticModel.GetTypeInfo(fd.Declaration.Type);
-			field.Type = typeInfo.Type?.ToDisplayString(FullyQualifiedFormatCustom) ?? fd.Declaration.Type.ToString();
+			field.Type = ResolveFullyQualifiedTypeName(fd.Declaration.Type, semanticModel);
 
 			field.SetModifiers(modifiers);
 
