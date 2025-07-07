@@ -5,10 +5,11 @@ namespace CSParser;
 
 public class CSClass : CSObject
 {
-	public List<CSField> Fields = new();
-	public List<string> Inherits = new();
-	public List<CSMethod> Methods = new();
-	public List<CSProperty> Properties = new();
+	public List<CSEvent> Events = [];
+	public List<CSField> Fields = [];
+	public List<string> Inherits = [];
+	public List<CSMethod> Methods = [];
+	public List<CSProperty> Properties = [];
 	public bool IsPartial { get; private set; }
 
 	protected override void SetupModifiers(string[] mods)
@@ -37,7 +38,8 @@ public class CSClass : CSObject
 
 	public bool IsEmpty()
 	{
-		return Fields.Count == 0 && Methods.Count == 0 && Properties.Count == 0;
+		return Fields.Count == 0 && Methods.Count == 0 && Properties.Count == 0 &&
+		       Events.Count == 0 && Inherits.Count == 0;
 	}
 
 	public bool IsExcluded(CSExclusions exclusions)
@@ -236,15 +238,15 @@ public class XMLDoc
 	public string Summary { get; set; } = "";
 	public string Remarks { get; set; } = "";
 	public string Returns { get; set; } = "";
-	public List<XMLDocParam> Parameters { get; } = new();
-	public List<XMLParamRef> ParamRefs { get; } = new();
-	public List<XMLException> Exceptions { get; } = new();
+	public List<XMLDocParam> Parameters { get; } = [];
+	public List<XMLParamRef> ParamRefs { get; } = [];
+	public List<XMLException> Exceptions { get; } = [];
 	public string Value { get; set; } = "";
-	public List<string> Examples { get; } = new();
+	public List<string> Examples { get; } = [];
 	public string InheritDoc { get; set; } = "";
 	public string Include { get; set; } = "";
-	public List<XMLSee> See { get; } = new();
-	public List<XMLSeeAlso> SeeAlso { get; } = new();
+	public List<XMLSee> See { get; } = [];
+	public List<XMLSeeAlso> SeeAlso { get; } = [];
 	public string TypeParam { get; set; } = "";
 	public string TypeParamRef { get; set; } = "";
 
@@ -361,11 +363,24 @@ public class CSParameter
 	}
 }
 
+public class CSEvent : CSObject
+{
+	public CSAccessModifier AccessModifier;
+	public CSDelegate Delegate;
+}
+
+public class CSDelegate : CSObject
+{
+	public List<CSParameter> Parameters = [];
+	public string ReturnType = "";
+}
+
 public class CSInfo
 {
-	public List<CSClass> Classes = new();
-	public List<CSEnum> Enums = new();
-	public List<CSInterface> Interfaces = new();
+	public List<CSClass> Classes = [];
+	public List<CSDelegate> Delegates = [];
+	public List<CSEnum> Enums = [];
+	public List<CSInterface> Interfaces = [];
 	public string? Namespace { get; set; }
 
 	public bool IsAllExcluded(CSExclusions exclusions)
@@ -375,7 +390,8 @@ public class CSInfo
 
 		return Classes.All(c => c.IsExcluded(exclusions) || c.IsEmpty()) &&
 		       Enums.All(e => e.IsExcluded(exclusions) || e.IsEmpty()) &&
-		       Interfaces.All(i => i.IsExcluded(exclusions) || i.IsEmpty());
+		       Interfaces.All(i => i.IsExcluded(exclusions) || i.IsEmpty()) &&
+		       Delegates.Count == 0;
 	}
 }
 
@@ -419,7 +435,8 @@ public class CSExclusions
 		Class,
 		Method,
 		Enum,
-		Interface
+		Interface,
+		Event
 	}
 
 	public List<string> Classes = new();
@@ -484,6 +501,11 @@ public class CSExclusions
 	public bool IsInterfaceExcluded(CSInterface @interface)
 	{
 		return Classes.Any(cls => new Regex(cls).IsMatch(@interface.Name)) || IsAccessModifierExcluded(@interface.AccessModifier);
+	}
+
+	public bool IsEventExcluded(CSEvent @event)
+	{
+		return Classes.Any(cls => new Regex(cls).IsMatch(@event.Name)) || IsAccessModifierExcluded(@event.AccessModifier);
 	}
 
 	public bool IsPropertyExcluded(CSProperty property)

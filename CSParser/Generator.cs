@@ -11,14 +11,26 @@ public partial class Generator
 	private static readonly SymbolDisplayFormat FullyQualifiedFormatCustom = new(
 		SymbolDisplayGlobalNamespaceStyle.Omitted,
 		SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-		SymbolDisplayGenericsOptions.IncludeTypeParameters);
+		SymbolDisplayGenericsOptions.IncludeTypeParameters,
+		SymbolDisplayMemberOptions.IncludeContainingType,
+		SymbolDisplayDelegateStyle.NameAndSignature,
+		SymbolDisplayExtensionMethodStyle.Default,
+		SymbolDisplayParameterOptions.None,
+		SymbolDisplayPropertyStyle.NameOnly,
+		SymbolDisplayLocalOptions.None,
+		SymbolDisplayKindOptions.None,
+		SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers | SymbolDisplayMiscellaneousOptions.ExpandNullable);
 
 	public static bool Debug;
 
-	private readonly List<SyntaxTree> _syntaxTrees = new();
+	private readonly HashSet<PortableExecutableReference> _references = [];
+
+	private readonly List<SyntaxTree> _syntaxTrees = [];
 	public readonly CSExclusions Exclusions = new();
 	private CSharpCompilation? _compilation;
-	public List<CSInfo> Namespaces = new();
+
+	private SyntaxTree _tree;
+	public List<CSInfo> Namespaces = [];
 
 	public Generator(string path = "")
 	{
@@ -47,34 +59,59 @@ public partial class Generator
 		Exclusions.Add(type, name);
 	}
 
+	public void AddAssemblyReference(string assemblyPath)
+	{
+		if (!File.Exists(assemblyPath))
+			throw new FileNotFoundException($"Assembly not found: {assemblyPath}");
+
+		var reference = MetadataReference.CreateFromFile(assemblyPath);
+		_references.Add(reference);
+
+		_compilation = _compilation?.AddReferences(reference);
+	}
+
+	public void AddAssemblyReferences(string directoryPath, string searchPattern = "*.dll")
+	{
+		if (!Directory.Exists(directoryPath))
+			throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+
+		var assemblyFiles = Directory.GetFiles(directoryPath, searchPattern, SearchOption.AllDirectories);
+
+		foreach (var assemblyFile in assemblyFiles)
+			try
+			{
+				AddAssemblyReference(assemblyFile);
+			}
+			catch (Exception ex)
+			{
+				Log($"Failed to load assembly {assemblyFile}: {ex.Message}");
+			}
+	}
+
 	public void AddDirectory(string path)
 	{
 		var files = Directory.GetFiles(path, "*.cs", SearchOption.AllDirectories);
-
 		foreach (var file in files) AddFile(file);
 	}
 
 	public void AddFile(string path)
 	{
 		var code = File.ReadAllText(path);
-
 		AddCode(code);
 	}
 
 	public void AddCode(string code)
 	{
-		var tree = CSharpSyntaxTree.ParseText(code);
-		_syntaxTrees.Add(tree);
+		_tree = CSharpSyntaxTree.ParseText(code);
+		_syntaxTrees.Add(_tree);
 
-		var referencedAssemblies = AppDomain.CurrentDomain.GetAssemblies()
-			.Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
-			.Select(a => MetadataReference.CreateFromFile(a.Location));
+		_compilation = CSharpCompilation.Create(
+			"CSParserCompilation",
+			_syntaxTrees,
+			_references,
+			new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-		_compilation = CSharpCompilation.Create("CSParserAnalysis")
-			.AddReferences(referencedAssemblies)
-			.AddSyntaxTrees(_syntaxTrees);
-
-		ProcessSyntaxTree(tree, code);
+		ProcessSyntaxTree(_tree, code);
 	}
 
 	private void ProcessSyntaxTree(SyntaxTree tree, string code)
@@ -85,16 +122,13 @@ public partial class Generator
 		var namespaces = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().ToList();
 		var namespaceFileScoped = false;
 
-		// This is a hack to find a file scope namespace since roslyn doesn't seem to support it.
 		if (namespaces.Count == 0)
 		{
 			var match = NamespaceRegex().Match(code);
-
 			if (match.Success)
 			{
 				namespaceFileScoped = true;
 				var fileScopeNamespace = match.Value.Replace("namespace ", "").Replace(";", "");
-
 				namespaces.Add(SyntaxFactory.NamespaceDeclaration(SyntaxFactory.ParseName(fileScopeNamespace)));
 			}
 		}
@@ -102,9 +136,7 @@ public partial class Generator
 		foreach (var nd in namespaces)
 		{
 			var namespaceName = nd.Name.ToString();
-
 			var node = namespaceFileScoped ? root : nd;
-
 			if (Exclusions.IsNamespaceExcluded(namespaceName))
 			{
 				Log($"Excluding namespace {namespaceName}");
@@ -119,7 +151,6 @@ public partial class Generator
 				foreach (var @class in classes)
 				{
 					var existingClass = existingInfo.Classes.FirstOrDefault(x => x.Name == @class.Name);
-
 					if (existingClass != null)
 					{
 						existingClass.Methods.AddRange(@class.Methods);
@@ -131,11 +162,10 @@ public partial class Generator
 					existingInfo.Classes.Add(@class);
 				}
 
-				var enums = GetEnums(node);
+				var enums = GetEnums(node, semanticModel);
 				foreach (var @enum in enums)
 				{
 					var existingEnum = existingInfo.Enums.FirstOrDefault(x => x.Name == @enum.Name);
-
 					if (existingEnum != null)
 					{
 						existingEnum.Values.AddRange(@enum.Values);
@@ -149,7 +179,6 @@ public partial class Generator
 				foreach (var @interface in interfaces)
 				{
 					var existingInterface = existingInfo.Interfaces.FirstOrDefault(x => x.Name == @interface.Name);
-
 					if (existingInterface != null)
 					{
 						existingInterface.Methods.AddRange(@interface.Methods);
@@ -160,6 +189,9 @@ public partial class Generator
 					existingInfo.Interfaces.Add(@interface);
 				}
 
+				var delegates = GetDelegates(node, semanticModel);
+				foreach (var @delegate in delegates) existingInfo.Delegates.Add(@delegate);
+
 				continue;
 			}
 
@@ -167,8 +199,9 @@ public partial class Generator
 			{
 				Namespace = namespaceName,
 				Classes = GetClasses(node, semanticModel),
-				Enums = GetEnums(node),
-				Interfaces = GetInterfaces(node, semanticModel)
+				Enums = GetEnums(node, semanticModel),
+				Interfaces = GetInterfaces(node, semanticModel),
+				Delegates = GetDelegates(node, semanticModel)
 			};
 
 			if (csInfo.IsAllExcluded(Exclusions))
@@ -181,31 +214,6 @@ public partial class Generator
 		}
 	}
 
-	private string ResolveFullyQualifiedTypeName(TypeSyntax typeSyntax, SemanticModel semanticModel)
-	{
-		var symbol = semanticModel.GetSymbolInfo(typeSyntax).Symbol;
-		if (symbol is INamedTypeSymbol { ContainingNamespace: not null } namedTypeSymbol)
-			return namedTypeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
-
-		var typeString = typeSyntax.ToString();
-
-		var declaredSymbol = semanticModel.LookupSymbols(typeSyntax.SpanStart, name: typeString)
-			.OfType<INamedTypeSymbol>()
-			.FirstOrDefault();
-
-		if (declaredSymbol?.ContainingNamespace is not null)
-			return declaredSymbol.ToDisplayString(FullyQualifiedFormatCustom);
-
-		if (typeString.Contains('.'))
-			return typeString;
-
-		var typeInfo = semanticModel.GetTypeInfo(typeSyntax);
-		if (typeInfo.Type is INamedTypeSymbol { ContainingNamespace: not null } typeSymbol)
-			return typeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
-
-		return typeString;
-	}
-
 	private List<CSClass> GetClasses(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var classes = root.DescendantNodes().OfType<ClassDeclarationSyntax>().ToList();
@@ -214,13 +222,25 @@ public partial class Generator
 		foreach (var cd in classes)
 		{
 			var className = cd.Identifier.ToString();
+			var classSymbol = semanticModel.GetDeclaredSymbol(cd);
+
+			var inherits = new List<string>();
+			if (classSymbol != null)
+			{
+				if (classSymbol.BaseType != null && classSymbol.BaseType.SpecialType != SpecialType.System_Object)
+					inherits.Add(classSymbol.BaseType.ToDisplayString(FullyQualifiedFormatCustom));
+				inherits.AddRange(classSymbol.Interfaces.Select(i => i.ToDisplayString(FullyQualifiedFormatCustom)));
+			}
+			else
+			{
+				inherits = cd.BaseList?.Types.Select(x => x.Type.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)).ToList() ??
+				           new List<string>();
+			}
 
 			var @class = new CSClass
 			{
 				Name = className,
-				Inherits = cd.BaseList?.Types
-					.Select(t => ResolveFullyQualifiedTypeName(t.Type, semanticModel))
-					.ToList() ?? new List<string>()
+				Inherits = inherits
 			};
 
 			@class.SetModifiers(cd.Modifiers.ToString());
@@ -240,12 +260,14 @@ public partial class Generator
 				existingClass.Methods.AddRange(GetMethods(cd, semanticModel));
 				existingClass.Properties.AddRange(GetProperties(cd, semanticModel));
 				existingClass.Fields.AddRange(GetFields(cd, semanticModel));
+				existingClass.Events.AddRange(GetEvents(cd, semanticModel));
 				continue;
 			}
 
 			@class.Methods = GetMethods(cd, semanticModel);
 			@class.Properties = GetProperties(cd, semanticModel);
 			@class.Fields = GetFields(cd, semanticModel);
+			@class.Events = GetEvents(cd, semanticModel);
 
 			classList.Add(@class);
 		}
@@ -253,16 +275,22 @@ public partial class Generator
 		return classList;
 	}
 
-	private List<CSEnum> GetEnums(SyntaxNode root)
+	private List<CSEnum> GetEnums(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var enumList = new List<CSEnum>();
-
 		var enums = root.DescendantNodes().OfType<EnumDeclarationSyntax>().ToList();
 
 		foreach (var ed in enums)
 		{
 			var enumName = ed.Identifier.ToString();
-			var enumType = ed.BaseList?.Types.FirstOrDefault()?.Type.ToString() ?? "";
+
+			var enumSymbol = semanticModel.GetDeclaredSymbol(ed);
+			var underlyingTypeSymbol = enumSymbol?.EnumUnderlyingType;
+			var underlyingTypeSyntax = ed.BaseList?.Types.FirstOrDefault()?.Type;
+
+			var enumType = underlyingTypeSymbol is not null
+				? underlyingTypeSymbol.ToDisplayString(FullyQualifiedFormatCustom)
+				: underlyingTypeSyntax?.ToString() ?? "int";
 
 			var csEnum = new CSEnum
 			{
@@ -296,7 +324,6 @@ public partial class Generator
 	private List<CSInterface> GetInterfaces(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var interfaceList = new List<CSInterface>();
-
 		var interfaces = root.DescendantNodes().OfType<InterfaceDeclarationSyntax>().ToList();
 
 		foreach (var id in interfaces)
@@ -326,42 +353,84 @@ public partial class Generator
 		return interfaceList;
 	}
 
+	private List<CSDelegate> GetDelegates(SyntaxNode root, SemanticModel semanticModel)
+	{
+		var delegateList = new List<CSDelegate>();
+		var delegates = root.DescendantNodes().OfType<DelegateDeclarationSyntax>().ToList();
+
+		foreach (var dd in delegates)
+		{
+			var delegateName = dd.Identifier.ToString();
+			var delegateSymbol = semanticModel.GetDeclaredSymbol(dd);
+			var returnType = delegateSymbol?.DelegateInvokeMethod?.ReturnType.ToDisplayString(FullyQualifiedFormatCustom)
+			                 ?? dd.ReturnType.ToString();
+
+			var csDelegate = new CSDelegate
+			{
+				Name = delegateName,
+				Parameters = dd.ParameterList.Parameters.Select(ps =>
+				{
+					var paramSymbol = semanticModel.GetDeclaredSymbol(ps);
+					return new CSParameter
+					{
+						Name = ps.Identifier.ToString(),
+						Type = paramSymbol?.Type.ToDisplayString(FullyQualifiedFormatCustom) ?? ps.Type?.ToString(),
+						Optional = ps.Default != null,
+						DefaultValue = ps.Default?.Value.ToString() ?? ""
+					};
+				}).ToList(),
+				ReturnType = returnType
+			};
+
+			csDelegate.SetModifiers(dd.Modifiers.ToString());
+
+			csDelegate.XmlDoc = GetXMLDocumentation(dd);
+
+			delegateList.Add(csDelegate);
+		}
+
+		return delegateList;
+	}
+
 	private static void Log(string message)
 	{
 		if (!Debug) return;
-
 		Console.WriteLine(message);
 	}
 
 	private List<CSMethod> GetMethods(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var methodList = new List<CSMethod>();
-
 		var methods = root.ChildNodes().OfType<MethodDeclarationSyntax>().ToList();
 
 		foreach (var md in methods)
 		{
 			var modifiers = md.Modifiers.ToString();
 
+			var methodSymbol = semanticModel.GetDeclaredSymbol(md);
+			var returnType = methodSymbol?.ReturnType.ToDisplayString(FullyQualifiedFormatCustom) ??
+			                 md.ReturnType.ToString();
+
 			var method = new CSMethod
 			{
 				Name = md.Identifier.ToString(),
-				ReturnType = ResolveFullyQualifiedTypeName(md.ReturnType, semanticModel)
+				ReturnType = returnType
 			};
 
 			var parameters = md.ParameterList.Parameters;
 
 			foreach (var ps in parameters)
 			{
+				var paramSymbol = semanticModel.GetDeclaredSymbol(ps);
 				var param = new CSParameter
 				{
 					Name = ps.Identifier.ToString(),
 					Optional = ps.Default != null,
-					DefaultValue = ps.Default?.Value.ToString() ?? ""
+					DefaultValue = ps.Default?.Value.ToString() ?? "",
+					Type = paramSymbol is not null
+						? paramSymbol.Type.ToDisplayString(FullyQualifiedFormatCustom)
+						: ps.Type?.ToString()
 				};
-
-				if (ps.Type is not null)
-					param.Type = ResolveFullyQualifiedTypeName(ps.Type, semanticModel);
 
 				method.Parameters.Add(param);
 			}
@@ -385,20 +454,22 @@ public partial class Generator
 	private List<CSProperty> GetProperties(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var propertyList = new List<CSProperty>();
-
 		var properties = root.ChildNodes().OfType<PropertyDeclarationSyntax>().ToList();
 
 		foreach (var pd in properties)
 		{
 			var modifiers = pd.Modifiers.ToString();
+			var symbol = semanticModel.GetDeclaredSymbol(pd)?.Type;
+			var propertyType = symbol is not null
+				? symbol.ToDisplayString(FullyQualifiedFormatCustom)
+				: pd.Type.ToString();
 
 			var property = new CSProperty
 			{
 				Name = pd.Identifier.ToString(),
-				DefaultValue = pd.Initializer?.Value.ToString().Trim('"') ?? ""
+				DefaultValue = pd.Initializer?.Value.ToString().Trim('"') ?? "",
+				Type = propertyType
 			};
-
-			property.Type = ResolveFullyQualifiedTypeName(pd.Type, semanticModel);
 
 			property.SetModifiers(modifiers);
 
@@ -419,35 +490,140 @@ public partial class Generator
 	private List<CSField> GetFields(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var fieldList = new List<CSField>();
-
 		var fields = root.ChildNodes().OfType<FieldDeclarationSyntax>().ToList();
 
 		foreach (var fd in fields)
 		{
 			var modifiers = fd.Modifiers.ToString();
 
-			var field = new CSField
+			foreach (var variable in fd.Declaration.Variables)
 			{
-				Name = fd.Declaration.Variables.First().Identifier.ToString(),
-				DefaultValue = fd.Declaration.Variables.First().Initializer?.Value.ToString().Trim('"') ?? ""
-			};
+				var field = new CSField
+				{
+					Name = variable.Identifier.ToString(),
+					DefaultValue = variable.Initializer?.Value.ToString().Trim('"') ?? ""
+				};
 
-			field.Type = ResolveFullyQualifiedTypeName(fd.Declaration.Type, semanticModel);
+				var typeSymbol = ( semanticModel.GetDeclaredSymbol(variable) as IFieldSymbol )?.Type;
 
-			field.SetModifiers(modifiers);
+				field.Type = typeSymbol is not null
+					? typeSymbol.ToDisplayString(FullyQualifiedFormatCustom)
+					: fd.Declaration.Type.ToString();
 
-			if (Exclusions.IsFieldExcluded(field))
-			{
-				Log($"Excluding field {field.Name}");
-				continue;
+				field.SetModifiers(modifiers);
+
+				if (Exclusions.IsFieldExcluded(field))
+				{
+					Log($"Excluding field {field.Name}");
+					continue;
+				}
+
+				field.XmlDoc = GetXMLDocumentation(fd);
+				fieldList.Add(field);
 			}
-
-			field.XmlDoc = GetXMLDocumentation(fd);
-
-			fieldList.Add(field);
 		}
 
 		return fieldList;
+	}
+
+	private List<CSEvent> GetEvents(SyntaxNode root, SemanticModel semanticModel)
+	{
+		var eventList = new List<CSEvent>();
+		var eventFields = root.ChildNodes().OfType<EventFieldDeclarationSyntax>();
+		foreach (var ef in eventFields)
+		{
+			var modifiers = ef.Modifiers.ToString();
+			var typeSyntax = ef.Declaration.Type;
+			foreach (var variable in ef.Declaration.Variables)
+			{
+				var eventSymbol = semanticModel.GetDeclaredSymbol(variable) as IEventSymbol;
+				var eventType = eventSymbol?.Type.ToDisplayString(FullyQualifiedFormatCustom) ?? typeSyntax.ToString();
+
+				var csEvent = new CSEvent
+				{
+					Name = variable.Identifier.ToString()
+				};
+
+				if (eventSymbol?.Type is INamedTypeSymbol { DelegateInvokeMethod: not null } namedTypeSymbol)
+					csEvent.Delegate = new CSDelegate
+					{
+						Name = namedTypeSymbol.Name,
+						ReturnType = namedTypeSymbol.DelegateInvokeMethod.ReturnType.ToDisplayString(FullyQualifiedFormatCustom),
+						Parameters = namedTypeSymbol.DelegateInvokeMethod.Parameters.Select(ps => new CSParameter
+						{
+							Name = ps.Name,
+							Type = ps.Type.ToDisplayString(FullyQualifiedFormatCustom),
+							Optional = ps.IsOptional,
+							DefaultValue = ps.HasExplicitDefaultValue ? ps.ExplicitDefaultValue?.ToString() ?? string.Empty : string.Empty
+						}).ToList()
+					};
+				else
+					csEvent.Delegate = new CSDelegate
+					{
+						Name = eventType,
+						ReturnType = "void",
+						Parameters = []
+					};
+
+				csEvent.SetModifiers(modifiers);
+
+				if (Exclusions.IsEventExcluded(csEvent))
+				{
+					Log($"Excluding event {csEvent.Name}");
+					continue;
+				}
+
+				csEvent.XmlDoc = GetXMLDocumentation(ef);
+				eventList.Add(csEvent);
+			}
+		}
+
+		var eventDeclarations = root.ChildNodes().OfType<EventDeclarationSyntax>();
+		foreach (var ed in eventDeclarations)
+		{
+			var modifiers = ed.Modifiers.ToString();
+			var eventSymbol = semanticModel.GetDeclaredSymbol(ed);
+			var eventType = eventSymbol?.Type.ToDisplayString(FullyQualifiedFormatCustom) ?? ed.Type.ToString();
+
+			var csEvent = new CSEvent
+			{
+				Name = ed.Identifier.ToString()
+			};
+
+			if (eventSymbol?.Type is INamedTypeSymbol { DelegateInvokeMethod: not null } namedTypeSymbol)
+				csEvent.Delegate = new CSDelegate
+				{
+					Name = namedTypeSymbol.Name,
+					ReturnType = namedTypeSymbol.DelegateInvokeMethod.ReturnType.ToDisplayString(FullyQualifiedFormatCustom),
+					Parameters = namedTypeSymbol.DelegateInvokeMethod.Parameters.Select(ps => new CSParameter
+					{
+						Name = ps.Name,
+						Type = ps.Type.ToDisplayString(FullyQualifiedFormatCustom),
+						Optional = ps.IsOptional,
+						DefaultValue = ps.HasExplicitDefaultValue ? ps.ExplicitDefaultValue?.ToString() ?? string.Empty : string.Empty
+					}).ToList()
+				};
+			else
+				csEvent.Delegate = new CSDelegate
+				{
+					Name = eventType,
+					ReturnType = "void",
+					Parameters = []
+				};
+
+			csEvent.SetModifiers(modifiers);
+
+			if (Exclusions.IsEventExcluded(csEvent))
+			{
+				Log($"Excluding event {csEvent.Name}");
+				continue;
+			}
+
+			csEvent.XmlDoc = GetXMLDocumentation(ed);
+			eventList.Add(csEvent);
+		}
+
+		return eventList;
 	}
 
 	private XMLDoc GetXMLDocumentation(CSharpSyntaxNode md)
@@ -552,7 +728,6 @@ public partial class Generator
 		return xmlDoc;
 	}
 
-	// This regex is used to find the file scope namespace, but it could fail
 	[GeneratedRegex("namespace [\\w|\\d|.]+;")]
 	private static partial Regex NamespaceRegex();
 }

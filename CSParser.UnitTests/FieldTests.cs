@@ -1,4 +1,6 @@
-﻿namespace CSParser.UnitTests;
+﻿using TestNamespace;
+
+namespace CSParser.UnitTests;
 
 public class FieldTests
 {

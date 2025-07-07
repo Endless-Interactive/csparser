@@ -3,6 +3,7 @@
 public class GeneratorTest
 {
 	private Generator _generator;
+	private TextWriter _originalOutput;
 	private StringWriter _output;
 
 	[SetUp]
@@ -11,10 +12,19 @@ public class GeneratorTest
 		Generator.Debug = false;
 
 		_output = new StringWriter();
+		_originalOutput = Console.Out;
 
 		_generator = new Generator();
 
 		Console.SetOut(_output);
+	}
+
+	[TearDown]
+	public void TearDown()
+	{
+		Console.SetOut(_originalOutput);
+
+		_output.Dispose();
 	}
 
 	[Test]
