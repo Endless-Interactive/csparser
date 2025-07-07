@@ -106,6 +106,7 @@ namespace TestNamespace;
 
 public class Test
 {
+	public string Test;
 	internal string TestField;
 }
 ");
@@ -114,7 +115,7 @@ public class Test
 		{
 			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Classes[0].Fields, Has.Count.EqualTo(0));
+			Assert.That(_generator.Namespaces[0].Classes[0].Fields, Has.Count.EqualTo(1));
 		});
 	}
 }

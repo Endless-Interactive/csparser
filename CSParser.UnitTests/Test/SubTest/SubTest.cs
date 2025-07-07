@@ -2,4 +2,5 @@
 
 public class SubTest
 {
+	public string TestField;
 }

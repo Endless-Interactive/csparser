@@ -26,6 +26,7 @@ public class GeneratorTest
 		{
 			Assert.That(_generator.Namespaces, Has.Count.EqualTo(2));
 			Assert.That(_generator.Namespaces[0].Namespace, Is.EqualTo("TestNamespace"));
+			Assert.That(_generator.Namespaces[0].Interfaces, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[1].Namespace, Is.EqualTo("TestNamespace.SubTest"));
 		});
 	}
@@ -38,6 +39,7 @@ namespace TestNamespace;
 
 public class Test
 {
+public string TestField;
 }
 ");
 		Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
@@ -95,6 +97,10 @@ namespace Test
 
 namespace Test2
 {
+	public class TestClass
+	{
+		public string TestField;
+	}
 }
 ");
 
@@ -114,6 +120,10 @@ namespace Test
 
 namespace Test2
 {
+	public class TestClass
+	{
+		public string TestField;
+	}
 }
 ");
 

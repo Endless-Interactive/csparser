@@ -107,6 +107,35 @@ public partial class Generator
 					existingInfo.Classes.Add(@class);
 				}
 
+				var enums = GetEnums(node);
+				foreach (var @enum in enums)
+				{
+					var existingEnum = existingInfo.Enums.FirstOrDefault(x => x.Name == @enum.Name);
+
+					if (existingEnum != null)
+					{
+						existingEnum.Values.AddRange(@enum.Values);
+						continue;
+					}
+
+					existingInfo.Enums.Add(@enum);
+				}
+
+				var interfaces = GetInterfaces(node);
+				foreach (var @interface in interfaces)
+				{
+					var existingInterface = existingInfo.Interfaces.FirstOrDefault(x => x.Name == @interface.Name);
+
+					if (existingInterface != null)
+					{
+						existingInterface.Methods.AddRange(@interface.Methods);
+						existingInterface.Properties.AddRange(@interface.Properties);
+						continue;
+					}
+
+					existingInfo.Interfaces.Add(@interface);
+				}
+
 				continue;
 			}
 
@@ -162,8 +191,6 @@ public partial class Generator
 				existingClass.Fields.AddRange(GetFields(cd));
 				continue;
 			}
-
-			// foreach (var p in GetProperties(cd)) Console.WriteLine($"Class: {@class.Name} Property: {p.Name}");
 
 			@class.Methods = GetMethods(cd);
 			@class.Properties = GetProperties(cd);
@@ -238,11 +265,9 @@ public partial class Generator
 				continue;
 			}
 
-
 			csInterface.XmlDoc = GetXMLDocumentation(id);
 			csInterface.Methods = GetMethods(id);
 			csInterface.Properties = GetProperties(id);
-			csInterface.Fields = GetFields(id);
 
 			interfaceList.Add(csInterface);
 		}

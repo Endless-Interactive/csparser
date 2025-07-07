@@ -16,6 +16,10 @@ public class NamespaceTests
 		_generator.AddCode(@"
 namespace Test
 {
+	public class TestClass
+	{
+		public string TestField;
+	}
 }
 ");
 
@@ -44,6 +48,7 @@ namespace Test
 {
 	public class TestClass
 	{
+		public string TestField;
 	}
 }
 
@@ -51,6 +56,7 @@ namespace Test2
 {
 	public class TestClass2
 	{
+		public string TestField2;
 	}
 }
 ");
@@ -81,6 +87,10 @@ namespace Test
 
 namespace Test2
 {
+	public class TestClass
+	{
+		public string TestField;
+	}
 }
 ");
 
@@ -108,6 +118,10 @@ namespace Test3
 
 namespace RandomTest
 {
+	public class TestClass
+	{
+		public string TestField;
+	}
 }
 ");
 

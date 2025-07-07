@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 
 namespace CSParser;
 
@@ -33,6 +34,16 @@ public class CSClass : CSObject
 
 		base.SetupAccessModifier(accessModifier);
 	}
+
+	public bool IsEmpty()
+	{
+		return Fields.Count == 0 && Methods.Count == 0 && Properties.Count == 0;
+	}
+
+	public bool IsExcluded(CSExclusions exclusions)
+	{
+		return exclusions.IsClassExcluded(this) || exclusions.IsAccessModifierExcluded(AccessModifier);
+	}
 }
 
 public class CSEnum : CSObjectWithType
@@ -42,6 +53,16 @@ public class CSEnum : CSObjectWithType
 	public override string ToString()
 	{
 		return !string.IsNullOrWhiteSpace(Type) ? $"{FullModifier} enum {Name} : {Type}" : $"{FullModifier} enum {Name}";
+	}
+
+	public bool IsEmpty()
+	{
+		return Values.Count == 0;
+	}
+
+	public bool IsExcluded(CSExclusions exclusions)
+	{
+		return exclusions.IsEnumExcluded(this) || exclusions.IsAccessModifierExcluded(AccessModifier);
 	}
 }
 
@@ -58,13 +79,22 @@ public class CSEnumValue
 
 public class CSInterface : CSObjectWithType
 {
-	public List<CSField> Fields = new();
 	public List<CSMethod> Methods = new();
 	public List<CSProperty> Properties = new();
 
 	public override string ToString()
 	{
 		return !string.IsNullOrWhiteSpace(Type) ? $"{FullModifier} interface {Name} : {Type}" : $"{FullModifier} interface {Name}";
+	}
+
+	public bool IsEmpty()
+	{
+		return Methods.Count == 0 && Properties.Count == 0;
+	}
+
+	public bool IsExcluded(CSExclusions exclusions)
+	{
+		return exclusions.IsInterfaceExcluded(this) || exclusions.IsAccessModifierExcluded(AccessModifier);
 	}
 }
 
@@ -340,10 +370,12 @@ public class CSInfo
 
 	public bool IsAllExcluded(CSExclusions exclusions)
 	{
-		return Classes.Count != 0 && Classes.All(c =>
-			c.Fields.Count != 0 && c.Fields.All(exclusions.IsFieldExcluded) && c.Methods.Count != 0 &&
-			c.Methods.All(exclusions.IsMethodExcluded) &&
-			c.Properties.Count != 0 && c.Properties.All(exclusions.IsPropertyExcluded));
+		if (Classes.Count != 0 && Enums.Count != 0 && Interfaces.Count != 0)
+			return false;
+
+		return Classes.All(c => c.IsExcluded(exclusions) || c.IsEmpty()) &&
+		       Enums.All(e => e.IsExcluded(exclusions) || e.IsEmpty()) &&
+		       Interfaces.All(i => i.IsExcluded(exclusions) || i.IsEmpty());
 	}
 }
 
@@ -391,6 +423,8 @@ public class CSExclusions
 	}
 
 	public List<string> Classes = new();
+	public List<string> Enums = new();
+	public List<string> Interfaces = new();
 	public List<string> Methods = new();
 	public List<CSAccessModifier> Modifiers = new();
 	public List<string> Namespaces = new();
@@ -417,6 +451,12 @@ public class CSExclusions
 				break;
 			case ExcludeType.Method:
 				Methods.Add(name);
+				break;
+			case ExcludeType.Enum:
+				Enums.Add(name);
+				break;
+			case ExcludeType.Interface:
+				Interfaces.Add(name);
 				break;
 		}
 	}

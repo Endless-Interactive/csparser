@@ -143,6 +143,7 @@ namespace Test
 {
 	public class TestClass
 	{
+		public string TestField;
 	}
 }
 ");
@@ -165,6 +166,7 @@ namespace Test
 	{
 		public class SubClass
 		{
+			public string TestField;
 		}
 	}
 }
@@ -216,11 +218,17 @@ namespace Test
 {
 	public class TestClass
 	{
+		public string TestField;
 	}
+
+	public class AnotherClass
+	{
+		public string AnotherField;
+	}	
 }
 ");
 
 		Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
-		Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(0));
+		Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
 	}
 }

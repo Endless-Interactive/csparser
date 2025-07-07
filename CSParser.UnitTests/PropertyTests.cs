@@ -106,6 +106,7 @@ namespace TestNamespace;
 
 public class Test
 {
+	public string TestField;
 	internal string TestProperty {get; set;}
 }
 ");

@@ -22,6 +22,7 @@ namespace TestNamespace;
 /// </summary>
 public class Test
 {
+	public int TestField;
 }
 ");
 
@@ -50,6 +51,7 @@ namespace TestNamespace;
 /// </summary>
 public class Test
 {
+	public int TestField;
 }
 ");
 
@@ -67,6 +69,7 @@ namespace TestNamespace;
 /// </remarks>
 public class Test
 {
+	public int TestField;
 }
 ");
 		Assert.That(_generator.Namespaces[0].Classes[0].XmlDoc.Remarks, Is.EqualTo("Test remarks"));
