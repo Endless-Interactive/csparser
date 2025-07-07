@@ -8,8 +8,16 @@ namespace CSParser;
 
 public partial class Generator
 {
+	private static readonly SymbolDisplayFormat FullyQualifiedFormatCustom = new(
+		SymbolDisplayGlobalNamespaceStyle.Omitted,
+		SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+		SymbolDisplayGenericsOptions.IncludeTypeParameters);
+
 	public static bool Debug;
+
+	private readonly List<SyntaxTree> _syntaxTrees = new();
 	public readonly CSExclusions Exclusions = new();
+	private CSharpCompilation? _compilation;
 	public List<CSInfo> Namespaces = new();
 
 	public Generator(string path = "")
@@ -56,6 +64,26 @@ public partial class Generator
 	public void AddCode(string code)
 	{
 		var tree = CSharpSyntaxTree.ParseText(code);
+		_syntaxTrees.Add(tree);
+
+		var references = new List<MetadataReference>
+		{
+			MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+			MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+			MetadataReference.CreateFromFile(typeof(List<>).Assembly.Location),
+			MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
+		};
+
+		_compilation = CSharpCompilation.Create("CSParserAnalysis")
+			.AddReferences(references)
+			.AddSyntaxTrees(_syntaxTrees);
+
+		ProcessSyntaxTree(tree, code);
+	}
+
+	private void ProcessSyntaxTree(SyntaxTree tree, string code)
+	{
+		var semanticModel = _compilation!.GetSemanticModel(tree);
 		var root = tree.GetRoot();
 
 		var namespaces = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().ToList();
@@ -91,7 +119,7 @@ public partial class Generator
 
 			if (existingInfo != null)
 			{
-				var classes = GetClasses(node);
+				var classes = GetClasses(node, semanticModel);
 				foreach (var @class in classes)
 				{
 					var existingClass = existingInfo.Classes.FirstOrDefault(x => x.Name == @class.Name);
@@ -142,7 +170,7 @@ public partial class Generator
 			var csInfo = new CSInfo
 			{
 				Namespace = namespaceName,
-				Classes = GetClasses(node),
+				Classes = GetClasses(node, semanticModel),
 				Enums = GetEnums(node),
 				Interfaces = GetInterfaces(node)
 			};
@@ -157,7 +185,7 @@ public partial class Generator
 		}
 	}
 
-	private List<CSClass> GetClasses(SyntaxNode root)
+	private List<CSClass> GetClasses(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var classes = root.DescendantNodes().OfType<ClassDeclarationSyntax>().ToList();
 		var classList = new List<CSClass>();
@@ -169,7 +197,29 @@ public partial class Generator
 			var @class = new CSClass
 			{
 				Name = className,
-				Inherits = cd.BaseList?.Types.Select(x => x.Type.ToString()).ToList() ?? new List<string>()
+				Inherits = cd.BaseList?.Types
+					.Select(x =>
+					{
+						var symbol = semanticModel.GetSymbolInfo(x.Type).Symbol;
+						if (symbol is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.ContainingNamespace is not null)
+							// Use the custom display format to get fully qualified name
+							return namedTypeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
+
+						// Fallback: try to get the full type string as written in source
+						var typeString = x.Type.ToString();
+
+						// If it's a qualified name (contains dots), return as-is
+						if (typeString.Contains('.')) return typeString;
+
+						// For unqualified names, we need to check using statements to resolve the full name
+						var typeInfo = semanticModel.GetTypeInfo(x.Type);
+						if (typeInfo.Type is INamedTypeSymbol typeSymbol && typeSymbol.ContainingNamespace is not null)
+							return typeSymbol.ToDisplayString(FullyQualifiedFormatCustom);
+
+						// Last resort: return the type name as-is
+						return typeString;
+					})
+					.ToList() ?? new List<string>()
 			};
 
 			@class.SetModifiers(cd.Modifiers.ToString());

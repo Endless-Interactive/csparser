@@ -1,4 +1,6 @@
-﻿namespace TestNamespace;
+﻿using TestNamespace.SubTest;
+
+namespace TestNamespace;
 
 public class Test
 {
