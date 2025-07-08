@@ -13,15 +13,17 @@ public class EnumTests
 	[Test]
 	public void EnumRenders()
 	{
-		_generator.AddCode(@"
-namespace TestNamespace;
+		_generator.AddCode("""
 
-public enum Test
-{
-	TestValue,
-	TestValue2
-}
-");
+		                   namespace TestNamespace;
+
+		                   public enum Test
+		                   {
+		                   	TestValue,
+		                   	TestValue2
+		                   }
+
+		                   """);
 
 		Assert.Multiple(() =>
 		{
@@ -32,23 +34,51 @@ public enum Test
 	}
 
 	[Test]
+	public void EnumInClassRenders()
+	{
+		_generator.AddCode("""
+
+		                   namespace TestNamespace;
+
+		                   public class TestClass
+		                   {
+		                    public enum TestEnum
+		                    {
+		                   			TestValue,
+		                   			TestValue2
+		                    }
+		                   }
+
+		                   """);
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Enums, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Enums[0].ToString(),
+				Is.EqualTo("public enum TestNamespace.TestClass.TestEnum : System.Int32"));
+		});
+	}
+
+	[Test]
 	public void EnumTypeRenders()
 	{
-		_generator.AddCode(@"
-namespace TestNamespace;
+		_generator.AddCode("""
 
-public enum Test : byte
-{
-	TestValue,
-	TestValue2
-}
-");
+		                   namespace TestNamespace;
+
+		                   public enum Test : byte
+		                   {
+		                   	TestValue,
+		                   	TestValue2
+		                   }
+
+		                   """);
 
 		Assert.Multiple(() =>
 		{
 			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[0].Enums, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Enums[0].ToString(), Is.EqualTo("public enum Test : System.Byte"));
+			Assert.That(_generator.Namespaces[0].Enums[0].ToString(), Is.EqualTo("public enum TestNamespace.Test : System.Byte"));
 			Assert.That(_generator.Namespaces[0].Enums[0].Values, Has.Count.EqualTo(2));
 		});
 	}

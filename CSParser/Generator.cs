@@ -294,7 +294,9 @@ public partial class Generator
 
 			var csEnum = new CSEnum
 			{
-				Name = enumName,
+				Name = enumSymbol is not null
+					? enumSymbol.ToDisplayString(FullyQualifiedFormatCustom)
+					: enumName,
 				Type = enumType
 			};
 
