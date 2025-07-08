@@ -53,8 +53,9 @@ public class EnumTests
 		Assert.Multiple(() =>
 		{
 			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Enums, Has.Count.EqualTo(1));
-			Assert.That(_generator.Namespaces[0].Enums[0].ToString(),
+			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Enums, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Enums[0].ToString(),
 				Is.EqualTo("public enum TestNamespace.TestClass.TestEnum : System.Int32"));
 		});
 	}

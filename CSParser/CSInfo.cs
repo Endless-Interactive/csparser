@@ -5,6 +5,7 @@ namespace CSParser;
 
 public class CSClass : CSObject
 {
+	public List<CSEnum> Enums = [];
 	public List<CSEvent> Events = [];
 	public List<CSField> Fields = [];
 	public List<string> Inherits = [];
@@ -39,7 +40,7 @@ public class CSClass : CSObject
 	public bool IsEmpty()
 	{
 		return Fields.Count == 0 && Methods.Count == 0 && Properties.Count == 0 &&
-		       Events.Count == 0 && Inherits.Count == 0;
+		       Events.Count == 0 && Inherits.Count == 0 && Enums.Count == 0;
 	}
 
 	public bool IsExcluded(CSExclusions exclusions)

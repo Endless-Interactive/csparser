@@ -199,7 +199,7 @@ public partial class Generator
 			{
 				Namespace = namespaceName,
 				Classes = GetClasses(node, semanticModel),
-				Enums = GetEnums(node, semanticModel),
+				Enums = GetNamespaceLevelEnums(node, semanticModel),
 				Interfaces = GetInterfaces(node, semanticModel),
 				Delegates = GetDelegates(node, semanticModel)
 			};
@@ -261,6 +261,7 @@ public partial class Generator
 				existingClass.Properties.AddRange(GetProperties(cd, semanticModel));
 				existingClass.Fields.AddRange(GetFields(cd, semanticModel));
 				existingClass.Events.AddRange(GetEvents(cd, semanticModel));
+				existingClass.Enums.AddRange(GetEnums(cd, semanticModel));
 				continue;
 			}
 
@@ -268,6 +269,7 @@ public partial class Generator
 			@class.Properties = GetProperties(cd, semanticModel);
 			@class.Fields = GetFields(cd, semanticModel);
 			@class.Events = GetEvents(cd, semanticModel);
+			@class.Enums = GetEnums(cd, semanticModel);
 
 			classList.Add(@class);
 		}
@@ -275,10 +277,60 @@ public partial class Generator
 		return classList;
 	}
 
+	private List<CSEnum> GetNamespaceLevelEnums(SyntaxNode namespaceNode, SemanticModel semanticModel)
+	{
+		var enumList = new List<CSEnum>();
+
+		var enumDeclarations = namespaceNode
+			.DescendantNodes()
+			.OfType<EnumDeclarationSyntax>()
+			.Where(e =>
+				e.Parent is NamespaceDeclarationSyntax ||
+				e.Parent is FileScopedNamespaceDeclarationSyntax ||
+				e.Parent == namespaceNode);
+
+		foreach (var enumDecl in enumDeclarations)
+		{
+			var enumSymbol = semanticModel.GetDeclaredSymbol(enumDecl);
+			var enumType = enumSymbol?.EnumUnderlyingType?.ToDisplayString(FullyQualifiedFormatCustom)
+			               ?? enumDecl.BaseList?.Types.FirstOrDefault()?.Type.ToString()
+			               ?? "int";
+
+			var csEnum = new CSEnum
+			{
+				Name = enumSymbol is not null
+					? enumSymbol.ToDisplayString(FullyQualifiedFormatCustom)
+					: enumDecl.Identifier.ToString(),
+				Type = enumType
+			};
+
+			csEnum.SetModifiers(enumDecl.Modifiers.ToString());
+
+			if (Exclusions.IsEnumExcluded(csEnum))
+			{
+				Log($"Excluding enum {csEnum.Name}");
+				continue;
+			}
+
+			csEnum.XmlDoc = GetXMLDocumentation(enumDecl);
+
+			foreach (var member in enumDecl.Members)
+				csEnum.Values.Add(new CSEnumValue
+				{
+					Name = member.Identifier.ToString(),
+					Value = member.EqualsValue?.Value.ToString() ?? string.Empty
+				});
+
+			enumList.Add(csEnum);
+		}
+
+		return enumList;
+	}
+
 	private List<CSEnum> GetEnums(SyntaxNode root, SemanticModel semanticModel)
 	{
 		var enumList = new List<CSEnum>();
-		var enums = root.DescendantNodes().OfType<EnumDeclarationSyntax>().ToList();
+		var enums = root.ChildNodes().OfType<EnumDeclarationSyntax>().ToList();
 
 		foreach (var ed in enums)
 		{
