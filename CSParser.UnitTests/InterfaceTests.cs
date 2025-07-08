@@ -66,6 +66,8 @@ public interface ITestInterface
 			Assert.That(_generator.Namespaces[1].Interfaces, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[1].Interfaces[0].Name, Is.EqualTo("IClass"));
 			Assert.That(_generator.Namespaces[1].Interfaces[0].Methods, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[1].Interfaces[0].Methods[0].Name, Is.EqualTo("TestMethod"));
+			Assert.That(_generator.Namespaces[1].Interfaces[0].Methods[0].FullModifier, Is.EqualTo(""));
 			Assert.That(_generator.Namespaces[1].Interfaces[0].Methods[0].Parameters, Has.Count.EqualTo(1));
 			Assert.That(_generator.Namespaces[1].Interfaces[0].Methods[0].Parameters[0].Type,
 				Is.EqualTo("RandomNamespace.SomethingRandom.NewClass"));

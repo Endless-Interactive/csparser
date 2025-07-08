@@ -107,7 +107,7 @@ public class CSObjectWithType : CSObject
 
 public class CSObject
 {
-	public CSAccessModifier AccessModifier;
+	public CSAccessModifier AccessModifier = CSAccessModifier.None;
 	public CSModifier Modifiers = CSModifier.None;
 	public string ModifierString = "";
 	public string Name = "";
@@ -137,7 +137,12 @@ public class CSObject
 	{
 		var modList = mod.Split(" ");
 
-		if (mod.Length == 0) return;
+		if (mod.Length == 0)
+		{
+			Modifiers = CSModifier.None;
+			ModifierString = string.Empty;
+			return;
+		}
 
 		var modCheck = modList[0];
 
@@ -158,11 +163,21 @@ public class CSObject
 
 		SetupAccessModifier(accessModifier);
 
-		if (mod.Length == 0) return;
+		if (mod.Length == 0)
+		{
+			Modifiers = CSModifier.None;
+			ModifierString = string.Empty;
+			return;
+		}
 
 		var mods = mod.Split(" ");
 
-		if (mods.Length == 0) return;
+		if (mods.Length == 0)
+		{
+			Modifiers = CSModifier.None;
+			ModifierString = string.Empty;
+			return;
+		}
 
 		SetupModifiers(mods);
 	}
@@ -223,6 +238,7 @@ public class CSObject
 		{
 			CSAccessModifier.PrivateProtected => "private protected",
 			CSAccessModifier.ProtectedInternal => "protected internal",
+			CSAccessModifier.None => string.Empty,
 			_ => modifier.ToString().ToLower()
 		};
 	}
@@ -397,6 +413,7 @@ public class CSInfo
 
 public enum CSAccessModifier
 {
+	None,
 	File,
 	Public,
 	Private,
