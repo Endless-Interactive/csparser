@@ -178,6 +178,7 @@ namespace Test
 			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(2));
 			Assert.That(_generator.Namespaces[0].Classes[0].Name, Is.EqualTo("TestClass"));
 			Assert.That(_generator.Namespaces[0].Classes[1].Name, Is.EqualTo("SubClass"));
+			Assert.That(_generator.Namespaces[0].Classes[1].ParentClass, Is.EqualTo("TestClass"));
 		});
 	}
 

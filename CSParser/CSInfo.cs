@@ -1,15 +1,14 @@
-﻿using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace CSParser;
 
 public class CSClass : CSObject
 {
-	public List<CSEnum> Enums = [];
 	public List<CSEvent> Events = [];
 	public List<CSField> Fields = [];
 	public List<string> Inherits = [];
 	public List<CSMethod> Methods = [];
+	public string ParentClass = string.Empty;
 	public List<CSProperty> Properties = [];
 	public bool IsPartial { get; private set; }
 
@@ -40,7 +39,7 @@ public class CSClass : CSObject
 	public bool IsEmpty()
 	{
 		return Fields.Count == 0 && Methods.Count == 0 && Properties.Count == 0 &&
-		       Events.Count == 0 && Inherits.Count == 0 && Enums.Count == 0;
+		       Events.Count == 0 && Inherits.Count == 0;
 	}
 
 	public bool IsExcluded(CSExclusions exclusions)
@@ -51,7 +50,8 @@ public class CSClass : CSObject
 
 public class CSEnum : CSObjectWithType
 {
-	public List<CSEnumValue> Values = new();
+	public string ParentClass = string.Empty;
+	public List<CSEnumValue> Values = [];
 
 	public override string ToString()
 	{
@@ -138,12 +138,7 @@ public class CSObject
 	{
 		var modList = mod.Split(" ");
 
-		if (mod.Length == 0)
-		{
-			Modifiers = CSModifier.None;
-			ModifierString = string.Empty;
-			return;
-		}
+		if (mod.Length == 0) return;
 
 		var modCheck = modList[0];
 
@@ -154,7 +149,7 @@ public class CSObject
 			modCheck = sec is "internal" or "protected" ? $"{modList[0]} {sec}" : modList[0];
 		}
 
-		var regex = new Regex(modCheck.ToLower() + @"[ ]?");
+		var regex = new Regex(modCheck.ToLower() + "[ ]?");
 
 		mod = regex.Replace(mod, "");
 
@@ -164,21 +159,11 @@ public class CSObject
 
 		SetupAccessModifier(accessModifier);
 
-		if (mod.Length == 0)
-		{
-			Modifiers = CSModifier.None;
-			ModifierString = string.Empty;
-			return;
-		}
+		if (mod.Length == 0) return;
 
 		var mods = mod.Split(" ");
 
-		if (mods.Length == 0)
-		{
-			Modifiers = CSModifier.None;
-			ModifierString = string.Empty;
-			return;
-		}
+		if (mods.Length == 0) return;
 
 		SetupModifiers(mods);
 	}
@@ -345,11 +330,52 @@ public class CSMethod : CSObject
 public class CSProperty : CSObject
 {
 	public string DefaultValue = "";
+	public CSAccessor? Getter;
+	public CSAccessor? Setter;
 	public string Type = "";
 
 	public override string ToString()
 	{
 		return $"{FullModifier} {Type} {Name}";
+	}
+
+	public class CSAccessor
+	{
+		public CSAccessModifier AccessModifier = CSAccessModifier.None;
+
+		public override string ToString()
+		{
+			return $"{GetModifier(AccessModifier)}";
+		}
+
+		public void SetModifiers(string mod)
+		{
+			if (mod.Length == 0)
+			{
+				AccessModifier = CSAccessModifier.None;
+				return;
+			}
+
+			var accessModifier = mod.ToLower();
+
+			switch (accessModifier)
+			{
+				case "public":
+					AccessModifier = CSAccessModifier.Public;
+					break;
+				case "private":
+					AccessModifier = CSAccessModifier.Private;
+					break;
+				case "protected":
+					AccessModifier = CSAccessModifier.Protected;
+					break;
+				case "internal":
+					AccessModifier = CSAccessModifier.Internal;
+					break;
+				default:
+					throw new Exception($"Unknown access modifier: {accessModifier}");
+			}
+		}
 	}
 }
 
@@ -382,8 +408,12 @@ public class CSParameter
 
 public class CSEvent : CSObject
 {
-	public CSAccessModifier AccessModifier;
 	public CSDelegate Delegate;
+
+	public bool IsExcluded(CSExclusions exclusions)
+	{
+		return exclusions.IsEventExcluded(this) || exclusions.IsAccessModifierExcluded(AccessModifier);
+	}
 }
 
 public class CSDelegate : CSObject

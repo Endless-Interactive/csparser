@@ -118,4 +118,82 @@ public class Test
 			Assert.That(_generator.Namespaces[0].Classes[0].Properties, Has.Count.EqualTo(0));
 		});
 	}
+
+	[Test]
+	public void PropertyHasDefaultGetterSetter()
+	{
+		_generator.AddCode(@"
+namespace TestNamespace;
+
+public class Test
+{
+	public string TestProperty {get; set;}
+}
+");
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Properties, Has.Count.EqualTo(1));
+			var property = _generator.Namespaces[0].Classes[0].Properties[0];
+			Assert.That(property.Getter, Is.Not.Null);
+			Assert.That(property.Setter, Is.Not.Null);
+
+			Assert.That(property.Getter?.ToString(), Is.EqualTo(""));
+			Assert.That(property.Setter?.ToString(), Is.EqualTo(""));
+		});
+	}
+
+	[Test]
+	public void PropertyHasPrivateSetter()
+	{
+		_generator.AddCode(@"
+namespace TestNamespace;
+
+public class Test
+{
+	public string TestProperty {get; private set;}
+}
+");
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Properties, Has.Count.EqualTo(1));
+			var property = _generator.Namespaces[0].Classes[0].Properties[0];
+			Assert.That(property.Getter, Is.Not.Null);
+			Assert.That(property.Setter, Is.Not.Null);
+
+			Assert.That(property.Getter?.ToString(), Is.EqualTo(""));
+			Assert.That(property.Setter?.ToString(), Is.EqualTo("private"));
+		});
+	}
+
+	[Test]
+	public void PropertyHasProtectedGetterPrivateSetter()
+	{
+		_generator.AddCode(@"
+namespace TestNamespace;
+
+public class Test
+{
+	public string TestProperty {protected get; private set;}
+}
+");
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(_generator.Namespaces, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes, Has.Count.EqualTo(1));
+			Assert.That(_generator.Namespaces[0].Classes[0].Properties, Has.Count.EqualTo(1));
+			var property = _generator.Namespaces[0].Classes[0].Properties[0];
+			Assert.That(property.Getter, Is.Not.Null);
+			Assert.That(property.Setter, Is.Not.Null);
+
+			Assert.That(property.Getter?.ToString(), Is.EqualTo("protected"));
+			Assert.That(property.Setter?.ToString(), Is.EqualTo("private"));
+		});
+	}
 }

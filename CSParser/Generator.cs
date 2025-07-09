@@ -147,7 +147,7 @@ public partial class Generator
 
 			if (existingInfo != null)
 			{
-				var classes = GetClasses(node, semanticModel);
+				var classes = GetClasses(existingInfo, node, semanticModel);
 				foreach (var @class in classes)
 				{
 					var existingClass = existingInfo.Classes.FirstOrDefault(x => x.Name == @class.Name);
@@ -198,11 +198,12 @@ public partial class Generator
 			var csInfo = new CSInfo
 			{
 				Namespace = namespaceName,
-				Classes = GetClasses(node, semanticModel),
 				Enums = GetNamespaceLevelEnums(node, semanticModel),
 				Interfaces = GetInterfaces(node, semanticModel),
 				Delegates = GetDelegates(node, semanticModel)
 			};
+
+			csInfo.Classes = GetClasses(csInfo, node, semanticModel);
 
 			if (csInfo.IsAllExcluded(Exclusions))
 			{
@@ -214,13 +215,14 @@ public partial class Generator
 		}
 	}
 
-	private List<CSClass> GetClasses(SyntaxNode root, SemanticModel semanticModel)
+	private List<CSClass> GetClasses(CSInfo @namespace, SyntaxNode root, SemanticModel semanticModel)
 	{
 		var classes = root.DescendantNodes().OfType<ClassDeclarationSyntax>().ToList();
 		var classList = new List<CSClass>();
 
 		foreach (var cd in classes)
 		{
+			var isNested = IsNestedClass(cd);
 			var className = cd.Identifier.ToString();
 			var classSymbol = semanticModel.GetDeclaredSymbol(cd);
 
@@ -234,7 +236,7 @@ public partial class Generator
 			else
 			{
 				inherits = cd.BaseList?.Types.Select(x => x.Type.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)).ToList() ??
-				           new List<string>();
+				           [];
 			}
 
 			var @class = new CSClass
@@ -261,7 +263,14 @@ public partial class Generator
 				existingClass.Properties.AddRange(GetProperties(cd, semanticModel));
 				existingClass.Fields.AddRange(GetFields(cd, semanticModel));
 				existingClass.Events.AddRange(GetEvents(cd, semanticModel));
-				existingClass.Enums.AddRange(GetEnums(cd, semanticModel));
+
+				foreach (var @enum in GetEnums(cd, semanticModel))
+				{
+					@enum.ParentClass = @class.Name;
+
+					@namespace.Enums.Add(@enum);
+				}
+
 				continue;
 			}
 
@@ -269,12 +278,26 @@ public partial class Generator
 			@class.Properties = GetProperties(cd, semanticModel);
 			@class.Fields = GetFields(cd, semanticModel);
 			@class.Events = GetEvents(cd, semanticModel);
-			@class.Enums = GetEnums(cd, semanticModel);
+
+			if (isNested && cd.Parent is ClassDeclarationSyntax parentClass)
+				@class.ParentClass = parentClass.Identifier.ToString();
+
+			foreach (var @enum in GetEnums(cd, semanticModel))
+			{
+				@enum.ParentClass = @class.Name;
+
+				@namespace.Enums.Add(@enum);
+			}
 
 			classList.Add(@class);
 		}
 
 		return classList;
+	}
+
+	private static bool IsNestedClass(ClassDeclarationSyntax classDeclaration)
+	{
+		return classDeclaration.Parent is ClassDeclarationSyntax;
 	}
 
 	private List<CSEnum> GetNamespaceLevelEnums(SyntaxNode namespaceNode, SemanticModel semanticModel)
@@ -522,8 +545,21 @@ public partial class Generator
 			{
 				Name = pd.Identifier.ToString(),
 				DefaultValue = pd.Initializer?.Value.ToString().Trim('"') ?? "",
-				Type = propertyType
+				Type = propertyType,
+				Getter = new CSProperty.CSAccessor(),
+				Setter = new CSProperty.CSAccessor()
 			};
+
+			if (pd.AccessorList != null)
+				foreach (var accessor in from accessor in pd.AccessorList.Accessors
+				         let accessorSymbol = semanticModel.GetDeclaredSymbol(accessor)
+				         let accessorType = accessorSymbol?.ReturnType.ToDisplayString(FullyQualifiedFormatCustom) ??
+				                            pd.Type.ToString()
+				         select accessor)
+					if (accessor.Kind() == SyntaxKind.GetAccessorDeclaration)
+						property.Getter.SetModifiers(accessor.Modifiers.ToString());
+					else if (accessor.Kind() == SyntaxKind.SetAccessorDeclaration)
+						property.Setter.SetModifiers(accessor.Modifiers.ToString());
 
 			property.SetModifiers(modifiers);
 
@@ -620,6 +656,7 @@ public partial class Generator
 					};
 
 				csEvent.SetModifiers(modifiers);
+				Console.WriteLine($"Event {csEvent.Name} of type {eventType} found with access modifer: {csEvent.AccessModifier}");
 
 				if (Exclusions.IsEventExcluded(csEvent))
 				{
