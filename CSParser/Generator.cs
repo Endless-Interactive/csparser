@@ -545,10 +545,24 @@ public partial class Generator
 			{
 				Name = pd.Identifier.ToString(),
 				DefaultValue = pd.Initializer?.Value.ToString().Trim('"') ?? "",
-				Type = propertyType,
-				Getter = new CSProperty.CSAccessor(),
-				Setter = new CSProperty.CSAccessor()
+				Type = propertyType
 			};
+
+			if (pd.ExpressionBody is not null)
+			{
+				property.Getter = new CSProperty.CSAccessor();
+				property.Setter = null;
+			}
+			else
+			{
+				property.Getter = pd.AccessorList?.Accessors.Any(a => a.Kind() == SyntaxKind.GetAccessorDeclaration) is true
+					? new CSProperty.CSAccessor()
+					: null;
+
+				property.Setter = pd.AccessorList?.Accessors.Any(a => a.Kind() == SyntaxKind.SetAccessorDeclaration) is true
+					? new CSProperty.CSAccessor()
+					: null;
+			}
 
 			if (pd.AccessorList != null)
 				foreach (var accessor in from accessor in pd.AccessorList.Accessors
@@ -557,9 +571,9 @@ public partial class Generator
 				                            pd.Type.ToString()
 				         select accessor)
 					if (accessor.Kind() == SyntaxKind.GetAccessorDeclaration)
-						property.Getter.SetModifiers(accessor.Modifiers.ToString());
+						property.Getter?.SetModifiers(accessor.Modifiers.ToString());
 					else if (accessor.Kind() == SyntaxKind.SetAccessorDeclaration)
-						property.Setter.SetModifiers(accessor.Modifiers.ToString());
+						property.Setter?.SetModifiers(accessor.Modifiers.ToString());
 
 			property.SetModifiers(modifiers);
 
