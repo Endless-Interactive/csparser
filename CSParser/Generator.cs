@@ -190,7 +190,23 @@ public partial class Generator
 				}
 
 				var delegates = GetDelegates(node, semanticModel);
-				foreach (var @delegate in delegates) existingInfo.Delegates.Add(@delegate);
+				foreach (var @delegate in delegates)
+					existingInfo.Delegates.Add(@delegate);
+
+				var structs = GetStructs(node, semanticModel);
+				foreach (var csStruct in structs)
+				{
+					var existingStruct = existingInfo.Structs.FirstOrDefault(x => x.Name == csStruct.Name);
+					if (existingStruct != null)
+					{
+						existingStruct.Constructors.AddRange(csStruct.Constructors);
+						existingStruct.Properties.AddRange(csStruct.Properties);
+						existingStruct.Fields.AddRange(csStruct.Fields);
+						continue;
+					}
+
+					existingInfo.Structs.Add(csStruct);
+				}
 
 				continue;
 			}
@@ -200,7 +216,8 @@ public partial class Generator
 				Namespace = namespaceName,
 				Enums = GetNamespaceLevelEnums(node, semanticModel),
 				Interfaces = GetInterfaces(node, semanticModel),
-				Delegates = GetDelegates(node, semanticModel)
+				Delegates = GetDelegates(node, semanticModel),
+				Structs = GetStructs(node, semanticModel)
 			};
 
 			csInfo.Classes = GetClasses(csInfo, node, semanticModel);
@@ -263,6 +280,7 @@ public partial class Generator
 				existingClass.Properties.AddRange(GetProperties(cd, semanticModel));
 				existingClass.Fields.AddRange(GetFields(cd, semanticModel));
 				existingClass.Events.AddRange(GetEvents(@namespace, cd, semanticModel));
+				existingClass.Constructors.AddRange(GetConstructors(cd, semanticModel));
 
 				foreach (var @enum in GetEnums(cd, semanticModel))
 				{
@@ -274,6 +292,7 @@ public partial class Generator
 				continue;
 			}
 
+			@class.Constructors = GetConstructors(cd, semanticModel);
 			@class.Methods = GetMethods(cd, semanticModel);
 			@class.Properties = GetProperties(cd, semanticModel);
 			@class.Fields = GetFields(cd, semanticModel);
@@ -293,6 +312,98 @@ public partial class Generator
 		}
 
 		return classList;
+	}
+
+	private List<CSStruct> GetStructs(SyntaxNode root, SemanticModel semanticModel)
+	{
+		var structs = root.DescendantNodes().OfType<StructDeclarationSyntax>().ToList();
+		var structList = new List<CSStruct>();
+
+		foreach (var sd in structs)
+		{
+			var parent = sd.Parent;
+			var isNested = parent is StructDeclarationSyntax or ClassDeclarationSyntax;
+			var structName = sd.Identifier.ToString();
+
+			var csStruct = new CSStruct
+			{
+				Name = structName
+			};
+
+			csStruct.SetModifiers(sd.Modifiers.ToString());
+
+			if (Exclusions.IsStructExcluded(csStruct))
+			{
+				Log($"Excluding struct {structName}");
+				continue;
+			}
+
+			csStruct.XmlDoc = GetXMLDocumentation(sd);
+
+			csStruct.Constructors = GetConstructors(sd, semanticModel);
+			csStruct.Properties = GetProperties(sd, semanticModel);
+			csStruct.Fields = GetFields(sd, semanticModel);
+
+			if (isNested)
+			{
+				var parentName = parent switch
+				{
+					StructDeclarationSyntax sds => sds.Identifier.ToString(),
+					ClassDeclarationSyntax cds => cds.Identifier.ToString(),
+					_ => string.Empty
+				};
+
+				if (!string.IsNullOrEmpty(parentName))
+					csStruct.ParentClass = parentName;
+			}
+
+			structList.Add(csStruct);
+		}
+
+		return structList;
+	}
+
+	private List<CSConstructor> GetConstructors(SyntaxNode node, SemanticModel semanticModel)
+	{
+		var constructorList = new List<CSConstructor>();
+		var constructors = node.ChildNodes().OfType<ConstructorDeclarationSyntax>().ToList();
+
+		foreach (var cd in constructors)
+		{
+			var modifiers = cd.Modifiers.ToString();
+			var constructorSymbol = semanticModel.GetDeclaredSymbol(cd);
+			var parameters = cd.ParameterList.Parameters;
+
+			var constructor = new CSConstructor
+			{
+				Name = cd.Identifier.ToString(),
+				Parameters = parameters.Select(ps =>
+				{
+					var paramSymbol = semanticModel.GetDeclaredSymbol(ps);
+					return new CSParameter
+					{
+						Name = ps.Identifier.ToString(),
+						Type = paramSymbol?.Type.ToDisplayString(FullyQualifiedFormatCustom) ?? ps.Type?.ToString(),
+						Optional = ps.Default != null,
+						DefaultValue = ps.Default?.Value.ToString() ?? ""
+					};
+				}).ToList(),
+				AccessModifier = constructorSymbol?.DeclaredAccessibility switch
+				{
+					Accessibility.Public => CSAccessModifier.Public,
+					Accessibility.Private => CSAccessModifier.Private,
+					Accessibility.Protected => CSAccessModifier.Protected,
+					Accessibility.Internal => CSAccessModifier.Internal,
+					Accessibility.ProtectedOrInternal => CSAccessModifier.ProtectedInternal,
+					_ => CSAccessModifier.None
+				},
+				XmlDoc = GetXMLDocumentation(cd)
+			};
+
+			constructorList.Add(constructor);
+		}
+
+		return constructorList;
 	}
 
 	private static bool IsNestedClass(ClassDeclarationSyntax classDeclaration)

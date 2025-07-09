@@ -4,6 +4,7 @@ namespace CSParser;
 
 public class CSClass : CSObject
 {
+	public List<CSConstructor> Constructors = [];
 	public List<CSEvent> Events = [];
 	public List<CSField> Fields = [];
 	public List<string> Inherits = [];
@@ -422,12 +423,34 @@ public class CSDelegate : CSObject
 	public string ReturnType = "";
 }
 
+public class CSStruct : CSObject
+{
+	public List<CSConstructor> Constructors = [];
+	public List<CSField> Fields = [];
+	public string ParentClass = string.Empty;
+	public List<CSProperty> Properties = [];
+
+	public bool IsEmpty()
+	{
+		return Fields.Count == 0 && Properties.Count == 0;
+	}
+}
+
+public class CSConstructor
+{
+	public CSAccessModifier AccessModifier = CSAccessModifier.None;
+	public string Name = string.Empty;
+	public List<CSParameter> Parameters = [];
+	public XMLDoc XmlDoc = new();
+}
+
 public class CSInfo
 {
 	public List<CSClass> Classes = [];
 	public List<CSDelegate> Delegates = [];
 	public List<CSEnum> Enums = [];
 	public List<CSInterface> Interfaces = [];
+	public List<CSStruct> Structs = [];
 	public string? Namespace { get; set; }
 
 	public bool IsAllExcluded(CSExclusions exclusions)
@@ -438,7 +461,8 @@ public class CSInfo
 		return Classes.All(c => c.IsExcluded(exclusions) || c.IsEmpty()) &&
 		       Enums.All(e => e.IsExcluded(exclusions) || e.IsEmpty()) &&
 		       Interfaces.All(i => i.IsExcluded(exclusions) || i.IsEmpty()) &&
-		       Delegates.Count == 0;
+		       Delegates.Count == 0 &&
+		       Structs.All(s => s.IsEmpty() || exclusions.IsStructExcluded(s));
 	}
 }
 
@@ -484,15 +508,18 @@ public class CSExclusions
 		Method,
 		Enum,
 		Interface,
-		Event
+		Event,
+		Struct
 	}
 
-	public List<string> Classes = new();
-	public List<string> Enums = new();
-	public List<string> Interfaces = new();
-	public List<string> Methods = new();
-	public List<CSAccessModifier> Modifiers = new();
-	public List<string> Namespaces = new();
+	public List<string> Classes = [];
+	public List<string> Enums = [];
+	public List<string> Events = [];
+	public List<string> Interfaces = [];
+	public List<string> Methods = [];
+	public List<CSAccessModifier> Modifiers = [];
+	public List<string> Namespaces = [];
+	public List<string> Structs = [];
 
 	public void Add(CSAccessModifier modifier)
 	{
@@ -522,6 +549,12 @@ public class CSExclusions
 				break;
 			case ExcludeType.Interface:
 				Interfaces.Add(name);
+				break;
+			case ExcludeType.Event:
+				Events.Add(name);
+				break;
+			case ExcludeType.Struct:
+				Structs.Add(name);
 				break;
 		}
 	}
@@ -553,7 +586,12 @@ public class CSExclusions
 
 	public bool IsEventExcluded(CSEvent @event)
 	{
-		return Classes.Any(cls => new Regex(cls).IsMatch(@event.Name)) || IsAccessModifierExcluded(@event.AccessModifier);
+		return Events.Any(ev => new Regex(ev).IsMatch(@event.Name)) || IsAccessModifierExcluded(@event.AccessModifier);
+	}
+
+	public bool IsStructExcluded(CSStruct @struct)
+	{
+		return Structs.Any(st => new Regex(st).IsMatch(@struct.Name)) || IsAccessModifierExcluded(@struct.AccessModifier);
 	}
 
 	public bool IsPropertyExcluded(CSProperty property)
