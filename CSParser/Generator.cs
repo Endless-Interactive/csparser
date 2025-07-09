@@ -262,7 +262,7 @@ public partial class Generator
 				existingClass.Methods.AddRange(GetMethods(cd, semanticModel));
 				existingClass.Properties.AddRange(GetProperties(cd, semanticModel));
 				existingClass.Fields.AddRange(GetFields(cd, semanticModel));
-				existingClass.Events.AddRange(GetEvents(cd, semanticModel));
+				existingClass.Events.AddRange(GetEvents(@namespace, cd, semanticModel));
 
 				foreach (var @enum in GetEnums(cd, semanticModel))
 				{
@@ -277,7 +277,7 @@ public partial class Generator
 			@class.Methods = GetMethods(cd, semanticModel);
 			@class.Properties = GetProperties(cd, semanticModel);
 			@class.Fields = GetFields(cd, semanticModel);
-			@class.Events = GetEvents(cd, semanticModel);
+			@class.Events = GetEvents(@namespace, cd, semanticModel);
 
 			if (isNested && cd.Parent is ClassDeclarationSyntax parentClass)
 				@class.ParentClass = parentClass.Identifier.ToString();
@@ -630,7 +630,7 @@ public partial class Generator
 		return fieldList;
 	}
 
-	private List<CSEvent> GetEvents(SyntaxNode root, SemanticModel semanticModel)
+	private List<CSEvent> GetEvents(CSInfo namepspace, SyntaxNode root, SemanticModel semanticModel)
 	{
 		var eventList = new List<CSEvent>();
 		var eventFields = root.ChildNodes().OfType<EventFieldDeclarationSyntax>();
@@ -641,36 +641,22 @@ public partial class Generator
 			foreach (var variable in ef.Declaration.Variables)
 			{
 				var eventSymbol = semanticModel.GetDeclaredSymbol(variable) as IEventSymbol;
-				var eventType = eventSymbol?.Type.ToDisplayString(FullyQualifiedFormatCustom) ?? typeSyntax.ToString();
+
+				var @delegate = namepspace.Delegates
+					.FirstOrDefault(d => d.Name == typeSyntax.ToString());
 
 				var csEvent = new CSEvent
 				{
-					Name = variable.Identifier.ToString()
-				};
-
-				if (eventSymbol?.Type is INamedTypeSymbol { DelegateInvokeMethod: not null } namedTypeSymbol)
-					csEvent.Delegate = new CSDelegate
+					Name = variable.Identifier.ToString(),
+					Delegate = @delegate ?? new CSDelegate
 					{
-						Name = namedTypeSymbol.Name,
-						ReturnType = namedTypeSymbol.DelegateInvokeMethod.ReturnType.ToDisplayString(FullyQualifiedFormatCustom),
-						Parameters = namedTypeSymbol.DelegateInvokeMethod.Parameters.Select(ps => new CSParameter
-						{
-							Name = ps.Name,
-							Type = ps.Type.ToDisplayString(FullyQualifiedFormatCustom),
-							Optional = ps.IsOptional,
-							DefaultValue = ps.HasExplicitDefaultValue ? ps.ExplicitDefaultValue?.ToString() ?? string.Empty : string.Empty
-						}).ToList()
-					};
-				else
-					csEvent.Delegate = new CSDelegate
-					{
-						Name = eventType,
+						Name = eventSymbol?.Type.ToString() ?? typeSyntax.ToString(),
 						ReturnType = "void",
 						Parameters = []
-					};
+					}
+				};
 
 				csEvent.SetModifiers(modifiers);
-				Console.WriteLine($"Event {csEvent.Name} of type {eventType} found with access modifer: {csEvent.AccessModifier}");
 
 				if (Exclusions.IsEventExcluded(csEvent))
 				{
